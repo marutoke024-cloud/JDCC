@@ -9,6 +9,7 @@ import {
 import * as db from './db.js';
 import { renderReader, readerRightPanel, openSheet, closeSheet } from './reader.js';
 import { initSync } from './sync.js';
+import { motifIcon, chapterMotifKey, matchMotif, homeArt } from './art.js';
 
 const $ = (s) => document.querySelector(s);
 const main = () => $('#main');
@@ -188,6 +189,7 @@ async function renderHome() {
             : '未読';
       return `
         <a class="ch-card ${st}" href="#/ch/${ch.chapter}">
+          <span class="ch-card-art">${motifIcon(chapterMotifKey(ch.chapter), 46)}</span>
           <div class="ch-card-top">
             <span class="ch-card-no">${String(ch.chapter).padStart(2, '0')}</span>
             <span class="ch-card-state">${stateLabel}</span>
@@ -211,6 +213,7 @@ async function renderHome() {
         <div class="home-date">${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日(${wd})</div>
         <h1 class="home-greeting">データセンター運用ガイドブック<br>を、毎日すこしずつ。</h1>
         <p class="home-sub">全13章・${fmtNum(state.totalChars)}字。今日の分だけ、静かに読み進めましょう。</p>
+        <figure class="home-figure">${homeArt()}</figure>
       </section>
 
       <section class="today-card" aria-label="今日の学習">
@@ -293,11 +296,15 @@ function renderGlossary(query) {
         )
         .join('');
       const more = occ.length > 8 ? `<span class="gl-occ-more">ほか${occ.length - 8}箇所</span>` : '';
+      const motif = matchMotif(g.term) || matchMotif(g.desc);
       return `
         <div class="gl-item">
-          <div class="gl-term">${esc(g.term)}<span class="gl-reading">${esc(g.reading)}</span></div>
-          <div class="gl-desc">${esc(g.desc)}</div>
-          ${occ.length ? `<div class="gl-occ">${chips}${more}</div>` : ''}
+          ${motif ? `<span class="gl-item-art">${motifIcon(motif, 40)}</span>` : ''}
+          <div class="gl-item-body">
+            <div class="gl-term">${esc(g.term)}<span class="gl-reading">${esc(g.reading)}</span></div>
+            <div class="gl-desc">${esc(g.desc)}</div>
+            ${occ.length ? `<div class="gl-occ">${chips}${more}</div>` : ''}
+          </div>
         </div>`;
     })
     .join('');

@@ -7,6 +7,7 @@ import {
   markParagraphRead, saveBookmark, chapterProgress, setChapterDone, chapterShortTitle,
 } from './state.js';
 import * as db from './db.js';
+import { chapterHero, sectionVignette, matchMotif } from './art.js';
 
 const isTouch = matchMedia('(pointer: coarse)').matches;
 
@@ -433,6 +434,38 @@ function blockHtml(b) {
     </div>`;
 }
 
+/**
+ * 本文ブロック列 → HTML。
+ * 見出し(節)の内容にマッチした挿絵を、節の直後に差し込む。
+ * 同じモチーフの連続は避け、章あたりの枚数も抑えて紙面を静かに保つ。
+ */
+function proseHtml(blocks) {
+  const MAX_VIGNETTES = 14;
+  let html = '';
+  let lastMotif = null;
+  let used = 0;
+  let firstHeading = true;
+  for (let i = 0; i < blocks.length; i++) {
+    const b = blocks[i];
+    html += blockHtml(b);
+    if (b.type !== 'heading' || used >= MAX_VIGNETTES) continue;
+    // 章の最初の節は扉絵と近すぎるため挿絵を入れない
+    if (firstHeading) {
+      firstHeading = false;
+      continue;
+    }
+    // 見出し + 直後の段落テキストからモチーフを決める
+    const nextPara = blocks[i + 1]?.type === 'para' ? blocks[i + 1].text : '';
+    const key = matchMotif(b.text + ' ' + nextPara.slice(0, 120));
+    if (key && key !== lastMotif) {
+      html += `<figure class="vignette" aria-hidden="true">${sectionVignette(key)}</figure>`;
+      lastMotif = key;
+      used++;
+    }
+  }
+  return html;
+}
+
 /* ============ メインの描画 ============ */
 
 export async function renderReader(main, no, targetPid) {
@@ -457,8 +490,9 @@ export async function renderReader(main, no, targetPid) {
         </div>
       </header>
       <hr class="reader-rule">
+      <figure class="hero-figure">${chapterHero(no)}</figure>
       <div class="prose" id="prose">
-        ${f.blocks.map(blockHtml).join('')}
+        ${proseHtml(f.blocks)}
       </div>
       ${
         f.appendix.length

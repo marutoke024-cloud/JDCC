@@ -315,6 +315,57 @@ body.focus-mode .sidebar, body.focus-mode .rightpanel { opacity: 0; pointer-even
 .ch-card-pct { font-size: 11px; color: var(--ink-soft); font-variant-numeric: tabular-nums; min-width: 33px; text-align: right; }
 .ch-card.done .ch-card-pct { color: var(--accent); font-weight: 600; }
 
+/* ---------- イラストレーション(藍1色の線画) ---------- */
+.art { display: block; color: var(--accent); }
+.art .lnA { fill: none; stroke: var(--accent); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.art .lnS { fill: none; stroke: var(--accent-line); stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.art .flA { fill: var(--accent); stroke: none; }
+.art .flS { fill: var(--accent-line); stroke: none; }
+.art .lnA.flT, .art .flT { fill: var(--accent-tint); }
+.art .lnA.flA { fill: var(--accent); }
+.art .art-dash { stroke-dasharray: 1 7; }
+.art .art-soft { opacity: 0.62; }
+.art .art-faint { opacity: 0.36; }
+
+/* ホームの扉絵 */
+.home-figure { margin: 26px 0 0; }
+.art-home { width: 100%; height: auto; }
+
+/* 章ヒーロー(扉絵) */
+.hero-figure {
+  margin: 0 0 34px;
+  padding: 18px 10px 10px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, var(--accent-tint), transparent 82%);
+}
+.art-hero { width: 100%; height: auto; }
+
+/* 節の挿絵 */
+.vignette { margin: 0.6em auto 2.1em; max-width: 340px; }
+.vignette .art-vignette { width: 100%; height: auto; }
+
+/* 章カードのモチーフ */
+.ch-card { overflow: hidden; }
+.ch-card-art {
+  position: absolute; right: 14px; bottom: 34px;
+  opacity: 0.5;
+  transition: opacity 0.25s var(--ease), transform 0.25s var(--ease);
+  pointer-events: none;
+}
+.ch-card:hover .ch-card-art { opacity: 0.9; transform: translateY(-2px); }
+.ch-card.done .ch-card-art { opacity: 0.75; }
+.ch-card-title { padding-right: 56px; }
+
+/* 用語集のモチーフ */
+.gl-item { display: flex; gap: 14px; align-items: flex-start; }
+.gl-item-art {
+  flex-shrink: 0; width: 54px; height: 54px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--accent-tint); border-radius: 12px;
+  margin-top: 2px;
+}
+.gl-item-body { flex: 1; min-width: 0; }
+
 /* サンプルデータ注意 */
 .sample-banner {
   margin: 20px 0 0;
