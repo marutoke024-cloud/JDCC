@@ -1,14 +1,16 @@
 name: Deploy to GitHub Pages
 
+# 開発ブランチへのプッシュを gh-pages ブランチへミラーして公開する。
+# (GITHUB_TOKEN では Pages サイトの新規作成ができないため、
+#  ブランチ方式の Pages を利用する)
+
 on:
   push:
     branches: [claude/build-prompt-implementation-yiav4d]
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
   group: pages
@@ -17,16 +19,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
-        with:
-          enablement: true
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: .
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Mirror to gh-pages
+        run: git push --force origin HEAD:gh-pages
