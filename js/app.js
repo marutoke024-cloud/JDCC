@@ -7,7 +7,10 @@ import {
   dailyTarget, remainingDaysEstimate, todayPlan, chapterShortTitle,
 } from './state.js';
 import * as db from './db.js';
-import { renderReader, readerRightPanel, openSheet, closeSheet } from './reader.js';
+import {
+  renderReader, readerRightPanel, openSheet, closeSheet, toggleSpeech, bindTtsBar,
+} from './reader.js';
+import * as tts from './tts.js';
 import { initSync } from './sync.js';
 import { motifIcon, chapterMotifKey, matchMotif, homeArt } from './art.js';
 
@@ -295,13 +298,28 @@ async function renderHome() {
 
 /* ============ 用語集ページ ============ */
 
-let occCache = null;
+let occIndex = null;
 
-function termOccurrences(term) {
-  if (!occCache) occCache = new Map();
-  if (occCache.has(term)) return occCache.get(term);
-  const out = [];
+/**
+ * 用語 → 登場箇所の索引を、本文1パスで構築する。
+ * 用語ごとに全文を走査すると語数×段落数の総当たりになり、
+ * 語数が増えたときに用語集ページが開かなくなるため、
+ * 全用語をまとめた1本の正規表現で一度だけ走査する。
+ */
+function buildOccIndex() {
+  if (occIndex) return occIndex;
+  occIndex = new Map();
+  const terms = [...state.glossary].sort((a, b) => b.term.length - a.term.length);
+  if (!terms.length) return occIndex;
+
+  for (const g of terms) occIndex.set(g.term, []);
+  const re = new RegExp(
+    terms.map((t) => t.term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'),
+    'g'
+  );
+  // 同じ節に複数回出る用語は、最初の段落だけを代表として残す
   const seen = new Set();
+
   for (const f of state.formatted.values()) {
     let num = null;
     for (const b of f.blocks) {
@@ -309,16 +327,25 @@ function termOccurrences(term) {
         num = b.num;
         continue;
       }
-      if (!b.text.includes(term)) continue;
-      // 同じ節に複数回登場する場合は、最初の段落だけを代表として示す
-      const key = `${f.chapter}|${num || ''}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push({ chapter: f.chapter, pid: b.pid, num });
+      if (b.type !== 'para') continue;
+      re.lastIndex = 0;
+      let m;
+      const hitsHere = new Set();
+      while ((m = re.exec(b.text))) {
+        if (hitsHere.has(m[0])) continue;
+        hitsHere.add(m[0]);
+        const key = `${m[0]}|${f.chapter}|${num || ''}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        occIndex.get(m[0])?.push({ chapter: f.chapter, pid: b.pid, num });
+      }
     }
   }
-  occCache.set(term, out);
-  return out;
+  return occIndex;
+}
+
+function termOccurrences(term) {
+  return buildOccIndex().get(term) || [];
 }
 
 function renderGlossary(query) {
@@ -685,6 +712,24 @@ function bindChrome() {
   };
   $('#btn-panel').onclick = () => document.body.classList.toggle('panel-open');
   $('#btn-notepad').onclick = () => toggleNotepad();
+
+  const btnTts = $('#btn-tts');
+  if (tts.isSupported) {
+    bindTtsBar();
+    // ポインタが乗った時点で音声エンジンを温めておき、押した瞬間に声が出るようにする
+    btnTts.addEventListener('pointerenter', () => tts.prewarm(), { once: true });
+    btnTts.onclick = () => {
+      const r = parseHash();
+      const no = r && r.seg[0] === 'ch' ? parseInt(r.seg[1], 10) : null;
+      if (!no) {
+        toast('章を開いてから読み上げを始めてください');
+        return;
+      }
+      toggleSpeech(no);
+    };
+  } else {
+    btnTts.hidden = true;
+  }
   $('#rightpanel').addEventListener('click', (e) => {
     if (e.target.closest('a')) document.body.classList.remove('panel-open');
   });
@@ -770,6 +815,14 @@ async function boot() {
   await route();
   iosInstallHint();
   initSync(); // Firebase設定があれば端末間同期を開始(なければローカルのみ)
+
+  // 音声リストの解決はブラウザ側が非同期に行うため、起動直後に始めておく。
+  // これで最初の「再生」を押したときの待ちがほぼなくなる。
+  if (tts.isSupported) {
+    requestIdleCallback
+      ? requestIdleCallback(() => tts.loadVoices())
+      : setTimeout(() => tts.loadVoices(), 300);
+  }
 
   if ('serviceWorker' in navigator) {
     try {

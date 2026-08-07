@@ -8,6 +8,7 @@ import {
 } from './state.js';
 import * as db from './db.js';
 import { chapterHero, sectionVignette, matchMotif } from './art.js';
+import * as tts from './tts.js';
 
 const isTouch = matchMedia('(pointer: coarse)').matches;
 
@@ -586,6 +587,14 @@ export async function renderReader(main, no, targetPid) {
 
   renderSummaryBox(main.querySelector('#summary-box'), no);
 
+  // 章が変わったら読み上げ単位を組み直す(再生中なら止める)
+  if (ttsChapter !== no) {
+    if (tts.isPlaying()) tts.stop();
+    ttsUnits = tts.speechUnits(f.blocks);
+    ttsChapter = no;
+    setTtsUI(false);
+  }
+
   main.querySelector('#btn-done').onclick = async () => {
     await setChapterDone(no, !prog.done);
     document.dispatchEvent(new CustomEvent('progress-changed'));
@@ -608,6 +617,134 @@ export async function renderReader(main, no, targetPid) {
   }
 
   return f;
+}
+
+/* ============ 読み上げ ============ */
+
+let ttsChapter = null;
+let ttsUnits = [];
+
+/** 現在ビューの中心にある段落のインデックスを、読み上げ単位から探す */
+function unitIndexAtView() {
+  const mid = innerHeight / 2;
+  let best = 0;
+  let bestD = Infinity;
+  ttsUnits.forEach((u, i) => {
+    const el = document.getElementById(u.pid);
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const d = Math.abs(r.top + r.height / 2 - mid);
+    if (d < bestD) {
+      bestD = d;
+      best = i;
+    }
+  });
+  return best;
+}
+
+function highlightUnit(unit) {
+  document.querySelectorAll('.speaking').forEach((e) => e.classList.remove('speaking'));
+  const el = document.getElementById(unit.pid);
+  if (!el) return;
+  el.classList.add('speaking');
+  const r = el.getBoundingClientRect();
+  // 画面から外れそうなときだけ、静かに追従させる
+  if (r.top < 90 || r.bottom > innerHeight - 120) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}
+
+function setTtsUI(playing) {
+  const bar = document.getElementById('tts-bar');
+  bar.hidden = false;
+  bar.classList.toggle('playing', playing);
+  document.getElementById('btn-tts')?.classList.toggle('active', playing);
+}
+
+function updateTtsPos(i) {
+  const pos = document.getElementById('tts-pos');
+  if (pos) pos.textContent = `${i + 1} / ${ttsUnits.length}`;
+}
+
+/** 読み上げの開始/停止。章ビューから呼ばれる */
+export async function toggleSpeech(chapterNo) {
+  if (!tts.isSupported) {
+    toast('この端末では読み上げに対応していません');
+    return;
+  }
+  if (tts.isPlaying()) {
+    tts.stop();
+    setTtsUI(false);
+    document.querySelectorAll('.speaking').forEach((e) => e.classList.remove('speaking'));
+    return;
+  }
+
+  const f = state.formatted.get(chapterNo);
+  if (!f) return;
+  if (ttsChapter !== chapterNo || !ttsUnits.length) {
+    ttsUnits = tts.speechUnits(f.blocks);
+    ttsChapter = chapterNo;
+  }
+  if (!ttsUnits.length) {
+    toast('読み上げる本文がありません');
+    return;
+  }
+
+  const start = unitIndexAtView();
+  setTtsUI(true);
+  document.getElementById('tts-label').textContent = `第${chapterNo}章を読み上げ中`;
+
+  const ok = await tts.play(ttsUnits, start, {
+    onUnit: (unit, i) => {
+      highlightUnit(unit);
+      updateTtsPos(i);
+      // 読み上げた段落はしおりとして記録しておく
+      if (!unit.heading) saveBookmark(chapterNo, unit.pid);
+    },
+    onEnd: () => {
+      setTtsUI(false);
+      document.querySelectorAll('.speaking').forEach((e) => e.classList.remove('speaking'));
+      toast('この章の読み上げが終わりました');
+    },
+  });
+  if (!ok) setTtsUI(false);
+}
+
+/** 読み上げバーの操作を1度だけ結線する */
+export function bindTtsBar() {
+  const bar = document.getElementById('tts-bar');
+  if (!bar || bar.dataset.bound) return;
+  bar.dataset.bound = '1';
+
+  document.getElementById('tts-toggle').onclick = () => toggleSpeech(ttsChapter ?? currentChapter);
+  document.getElementById('tts-next').onclick = () => tts.next();
+  document.getElementById('tts-prev').onclick = () => tts.prev();
+  document.getElementById('tts-close').onclick = () => {
+    tts.stop();
+    bar.hidden = true;
+    document.getElementById('btn-tts')?.classList.remove('active');
+    document.querySelectorAll('.speaking').forEach((e) => e.classList.remove('speaking'));
+  };
+
+  const rate = document.getElementById('tts-rate');
+  rate.value = tts.ttsState.rate;
+  document.getElementById('tts-rate-val').textContent = `${Number(rate.value).toFixed(2)}×`;
+  rate.oninput = () => {
+    document.getElementById('tts-rate-val').textContent = `${Number(rate.value).toFixed(2)}×`;
+  };
+  rate.onchange = () => tts.setRate(parseFloat(rate.value));
+
+  const sel = document.getElementById('tts-voice');
+  sel.onchange = () => tts.setVoice(sel.value);
+  // 音声リストは非同期に埋まるので、揃ってから流し込む
+  tts.loadVoices().then(() => {
+    const list = tts.japaneseVoices();
+    const cur = tts.pickVoice();
+    sel.innerHTML = list.length
+      ? list.map((v) => `<option value="${esc(v.voiceURI)}">${esc(v.name)}</option>`).join('')
+      : '<option>日本語の音声がありません</option>';
+    if (cur) sel.value = cur.voiceURI;
+  });
 }
 
 /** 右パネル用:章内目次 + 統計 */

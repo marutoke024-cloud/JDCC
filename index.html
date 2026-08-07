@@ -92,6 +92,9 @@
       <button class="icon-btn" id="btn-notepad" aria-label="メモパッド" title="メモパッド">
         <svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4"/><path d="M9.5 12h6M9.5 16h4"/></svg>
       </button>
+      <button class="icon-btn" id="btn-tts" aria-label="読み上げ" title="読み上げ">
+        <svg viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M16 9.2a4 4 0 0 1 0 5.6"/><path d="M18.8 6.5a7.6 7.6 0 0 1 0 11"/></svg>
+      </button>
       <button class="icon-btn" id="btn-theme" aria-label="表示テーマ切り替え" title="テーマ">
         <svg viewBox="0 0 24 24" class="theme-icon-light"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>
         <svg viewBox="0 0 24 24" class="theme-icon-dark"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5z"/></svg>
@@ -144,6 +147,31 @@
       マーカー
     </button>
   </div>
+  <div class="tts-bar" id="tts-bar" hidden>
+    <button class="tts-btn" id="tts-prev" aria-label="前の段落">
+      <svg viewBox="0 0 24 24"><path d="M17 5L9 12l8 7z"/><path d="M7 5v14"/></svg>
+    </button>
+    <button class="tts-btn tts-main" id="tts-toggle" aria-label="読み上げ">
+      <svg class="ico-play" viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z"/></svg>
+      <svg class="ico-stop" viewBox="0 0 24 24"><rect x="7" y="6" width="4" height="12" rx="1"/><rect x="13" y="6" width="4" height="12" rx="1"/></svg>
+    </button>
+    <button class="tts-btn" id="tts-next" aria-label="次の段落">
+      <svg viewBox="0 0 24 24"><path d="M7 5l8 7-8 7z"/><path d="M17 5v14"/></svg>
+    </button>
+    <div class="tts-meta">
+      <span class="tts-label" id="tts-label">読み上げ</span>
+      <span class="tts-pos" id="tts-pos"></span>
+    </div>
+    <label class="tts-rate">
+      <span id="tts-rate-val">1.05×</span>
+      <input type="range" id="tts-rate" min="0.6" max="2" step="0.05" value="1.05" aria-label="読み上げ速度">
+    </label>
+    <select class="tts-voice" id="tts-voice" aria-label="声を選ぶ"></select>
+    <button class="tts-btn tts-close" id="tts-close" aria-label="読み上げを終了">
+      <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+
   <div class="toast" id="toast" hidden></div>
 
   <script type="module" src="js/app.js"></script>
