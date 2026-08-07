@@ -27,8 +27,11 @@
   --shadow-md: 0 2px 6px rgba(42, 42, 40, 0.06), 0 10px 30px rgba(42, 42, 40, 0.10);
   --shadow-lg: 0 4px 12px rgba(42, 42, 40, 0.08), 0 24px 60px rgba(42, 42, 40, 0.16);
 
-  --serif: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", serif;
-  --sans: "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+  /* Webフォントが届かない場合でも、各OSの明朝/ゴシックで読める並び */
+  --serif: "Noto Serif JP", "Hiragino Mincho ProN", "Hiragino Mincho Pro",
+           "Yu Mincho", YuMincho, "Source Han Serif JP", "Noto Serif CJK JP", serif;
+  --sans: "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Hiragino Sans",
+          "Yu Gothic", YuGothic, Meiryo, "Source Han Sans JP", "Noto Sans CJK JP", sans-serif;
 
   --radius: 10px;
   --radius-lg: 14px;

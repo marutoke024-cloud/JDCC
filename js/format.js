@@ -66,17 +66,12 @@ export function splitHeading(raw, chapterNo) {
   }
   const num = m[1];
   if (parseInt(num, 10) !== chapterNo) return null;
-  let rest = m[2].trim();
+  const rest = m[2].trim();
 
   if (!rest) return { num, title: '', body: '' };
 
-  // 本文(句点を含む文)が続かない短いテキスト → 段落全体が見出し
-  if (!rest.includes('。') && rest.length <= 60) {
-    return { num, title: tightenSpaces(rest), body: '' };
-  }
-
-  // 見出しと本文が同じ段落に連結しているケース:
-  // PDF抽出では見出しタイトルと本文の間に空白が残っているため、
+  // 見出しと本文が同じ段落に連結しているケース。
+  // PDF抽出では見出しタイトルと本文の間に空白が残るため、
   // 最初の空白区切りまでを見出しタイトルとして切り出す。
   const ws = rest.search(/[\s　]/);
   if (ws > 0 && ws <= 40) {
@@ -87,8 +82,110 @@ export function splitHeading(raw, chapterNo) {
     };
   }
 
-  // 空白が見つからない場合は切り出しを諦め、番号のみ見出しとして扱う
+  // 空白がない短いテキストは、段落全体が見出し
+  if (ws < 0 && !rest.includes('。') && rest.length <= 60) {
+    return { num, title: tightenSpaces(rest), body: '' };
+  }
+
+  // 見出しタイトルを特定できない場合は番号のみ見出しとし、本文は本文のまま残す
   return { num, title: '', body: rest };
+}
+
+/* ---------- 段落の連結(PDF行折り返しの復元) ---------- */
+
+/** 文末とみなす文字で終わっているか */
+const RE_SENTENCE_END = /[。！？!?」』】〕》]\s*$/;
+
+/** 見出し番号で始まる段落か(章番号一致のみ) */
+function looksLikeHeading(raw, chapterNo) {
+  const m = raw.trim().match(/^(\d{1,2})(?:\.\d{1,2}){1,2}[\s　]/);
+  return !!m && parseInt(m[1], 10) === chapterNo;
+}
+
+/**
+ * 「10.1 建物/衛生設備」のように、見出し番号とタイトルだけで完結した行か。
+ * この形は句点で終わらないが、次の本文と連結してはならない。
+ */
+function isHeadingOnlyLine(raw, chapterNo) {
+  const m = raw.trim().match(/^(\d{1,2})(?:\.\d{1,2}){1,2}[\s　]+(.+)$/);
+  if (!m || parseInt(m[1], 10) !== chapterNo) return false;
+  const rest = m[2].trim();
+  return rest.length <= 40 && !rest.includes('。') && !/[\s　]/.test(rest);
+}
+
+/**
+ * 表・箇条書き・注記など、前後と連結すべきでない独立行か。
+ * PDF抽出では、これらは先頭に空白が残るか記号で始まる。
+ */
+function isStandaloneLine(raw) {
+  if (/^[\s　]/.test(raw)) return true;
+  const t = raw.trim();
+  return /^(表|図)[\s　]*\d/.test(t) || /^[・･▪●○◇◆■□※＊*\-–—]/.test(t);
+}
+
+/**
+ * 表の本体行か。列がスペースで区切られ、文になっていない行を判定する。
+ * この行のスペースは意味を持つため、詰めずに保つ。
+ */
+function looksLikeTableRow(text) {
+  const spaces = (text.match(/[ 　]/g) || []).length;
+  return spaces >= 4 && !text.includes('。');
+}
+
+/**
+ * 句点で終わらない段落を次の段落と連結し、PDFの行折り返しで
+ * 分断された文を復元する。原文は変更せず、表示用の配列を返すだけ。
+ *
+ * 戻り値: [{ text, index, chars }]
+ *   index — 連結元の先頭段落インデックス(段落IDの基準)
+ *   chars — 連結した全段落の原文文字数の合計
+ */
+export function mergeParagraphs(paragraphs, chapterNo) {
+  const out = [];
+  let cur = null;
+
+  for (let i = 0; i < paragraphs.length; i++) {
+    const raw = paragraphs[i];
+    const standalone = isStandaloneLine(raw);
+    const heading = looksLikeHeading(raw, chapterNo);
+    const headingOnly = isHeadingOnlyLine(raw, chapterNo);
+
+    // 連結中で、この行が独立行/見出しなら、いったん確定させる
+    if (cur && (standalone || heading)) {
+      out.push(cur);
+      cur = null;
+    }
+
+    if (!cur) {
+      cur = { text: raw.trim(), index: i, chars: raw.length, table: standalone };
+    } else {
+      // 連結: 行末の折り返しなので区切り文字は挟まない
+      cur.text += raw.trim();
+      cur.chars += raw.length;
+    }
+
+    // 文末で終わっていれば確定。独立行と見出しのみの行も単独で確定させる
+    if (standalone || headingOnly || RE_SENTENCE_END.test(cur.text)) {
+      if (!cur.table && looksLikeTableRow(cur.text)) cur.table = true;
+      out.push(cur);
+      cur = null;
+    }
+  }
+  if (cur) {
+    if (!cur.table && looksLikeTableRow(cur.text)) cur.table = true;
+    out.push(cur);
+  }
+  return out;
+}
+
+/** 段落0に混ざる「第N章 タイトル」を取り除く */
+function stripChapterTitle(text, chapterNo) {
+  const re = new RegExp(`^第${chapterNo}章[\\s　]*`);
+  if (!re.test(text)) return text;
+  const rest = text.replace(re, '');
+  // 章タイトルの直後は空白で本文が続く
+  const ws = rest.search(/[\s　]/);
+  return ws > 0 && ws <= 40 ? rest.slice(ws + 1).trim() : rest.trim();
 }
 
 /** 段落ID(データ設計 §5): ch{2桁}-p{4桁} */
@@ -96,11 +193,19 @@ export function paragraphId(chapterNo, index) {
   return `ch${String(chapterNo).padStart(2, '0')}-p${String(index).padStart(4, '0')}`;
 }
 
-/** 第13章の奥付開始を検出する(§3-5) */
+/**
+ * 第13章末尾の付録(索引・図表目次・謝辞・WG参加者名簿・奥付)の開始を
+ * 検出する(§3-5)。実データでは
+ * 索引 → 図表目次 → 執筆メンバー → 査読者 → WG参加者 → 奥付 の順に並ぶ。
+ */
 function isColophonStart(text) {
+  const t = text.trim();
   return (
-    text.includes('データセンター運用ガイドブック') &&
-    (text.includes('初版発行') || text.includes('2020年12月1日'))
+    /^索引$/.test(t) ||
+    /\.{6,}/.test(t) || // ドットリーダー = 索引・図表目次
+    /ワーキンググループ[\s　]*(執筆メンバー|（初版）|\(初版\))/.test(t) ||
+    /初版発行/.test(t) ||
+    /^データセンター運用ガイドブック$/.test(t)
   );
 }
 
@@ -124,15 +229,39 @@ export function formatChapter(chapterData) {
   let charTotal = 0;
   let inAppendix = false;
 
-  (chapterData.paragraphs || []).forEach((raw, i) => {
-    const pid = paragraphId(no, i);
+  // PDFの行折り返しで分断された段落を先に復元する
+  const merged = mergeParagraphs(chapterData.paragraphs || [], no);
 
-    if (no === 13 && !inAppendix && isColophonStart(raw)) {
+  merged.forEach((m, mi) => {
+    const pid = paragraphId(no, m.index);
+
+    if (no === 13 && !inAppendix && isColophonStart(m.text)) {
       inAppendix = true;
     }
     const target = inAppendix ? appendix : blocks;
 
-    const h = inAppendix ? null : splitHeading(raw, no);
+    const pushPara = (raw) => {
+      // 表・箇条書き行のスペースは列区切りなので詰めない
+      const body = m.table ? raw : tightenSpaces(raw);
+      const sentences = m.table ? [body] : splitSentences(body);
+      if (!sentences.length || !body.trim()) return;
+      target.push({
+        type: 'para',
+        id: pid,
+        pid,
+        table: !!m.table,
+        sentences,
+        text: sentences.join(''),
+        chars: m.chars,
+      });
+      if (!inAppendix) charTotal += m.chars;
+    };
+
+    let text = m.text;
+    // 章冒頭に混ざる「第N章 タイトル」は本文から取り除く
+    if (mi === 0) text = stripChapterTitle(text, no);
+
+    const h = inAppendix ? null : splitHeading(text, no);
     if (h) {
       const headingBlock = {
         type: 'heading',
@@ -142,21 +271,14 @@ export function formatChapter(chapterData) {
         id: `${pid}-h`,
       };
       target.push(headingBlock);
-      toc.push({ num: h.num, text: h.title, level: headingBlock.level, id: headingBlock.id });
-      if (!h.body) return;
-      const body = tightenSpaces(h.body);
-      const sentences = splitSentences(body);
-      const text = sentences.join('');
-      target.push({ type: 'para', id: pid, pid, sentences, text, chars: raw.length });
-      if (!inAppendix) charTotal += raw.length;
+      if (h.title) {
+        toc.push({ num: h.num, text: h.title, level: headingBlock.level, id: headingBlock.id });
+      }
+      if (h.body) pushPara(h.body);
       return;
     }
 
-    const body = tightenSpaces(raw.trim());
-    const sentences = splitSentences(body);
-    const text = sentences.join('');
-    target.push({ type: 'para', id: pid, pid, sentences, text, chars: raw.length });
-    if (!inAppendix) charTotal += raw.length;
+    pushPara(text);
   });
 
   return { chapter: no, title: chapterData.title, blocks, appendix, toc, charTotal };

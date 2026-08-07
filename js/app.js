@@ -265,6 +265,7 @@ function termOccurrences(term) {
   if (!occCache) occCache = new Map();
   if (occCache.has(term)) return occCache.get(term);
   const out = [];
+  const seen = new Set();
   for (const f of state.formatted.values()) {
     let num = null;
     for (const b of f.blocks) {
@@ -272,7 +273,12 @@ function termOccurrences(term) {
         num = b.num;
         continue;
       }
-      if (b.text.includes(term)) out.push({ chapter: f.chapter, pid: b.pid, num });
+      if (!b.text.includes(term)) continue;
+      // 同じ節に複数回登場する場合は、最初の段落だけを代表として示す
+      const key = `${f.chapter}|${num || ''}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ chapter: f.chapter, pid: b.pid, num });
     }
   }
   occCache.set(term, out);
