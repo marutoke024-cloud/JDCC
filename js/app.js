@@ -23,6 +23,29 @@ function applyTheme() {
 }
 applyTheme();
 
+/* ============ 本文の幅 ============ */
+
+// [本文の上限, レイアウトの上限, 本文の文字サイズ]
+const READING_WIDTHS = {
+  narrow: ['980px', '2200px', '16px'],
+  wide: ['1320px', '2400px', '16.5px'],
+  full: ['1800px', '100%', '17px'],
+};
+
+function currentReadingWidth() {
+  const k = localStorage.getItem('reading-width');
+  return READING_WIDTHS[k] ? k : 'full';
+}
+
+function applyReadingWidth(key) {
+  const w = READING_WIDTHS[key] || READING_WIDTHS.full;
+  localStorage.setItem('reading-width', key);
+  const s = document.documentElement.style;
+  s.setProperty('--reading-width', w[0]);
+  s.setProperty('--layout-max', w[1]);
+  s.setProperty('--prose-size', w[2]);
+}
+
 /* ============ ルーター ============ */
 
 function parseHash() {
@@ -451,10 +474,39 @@ function openSettings() {
                value="${isChars ? (s.mode === 'chars' ? s.value : 3000) : s.mode === 'days' ? s.value : 90}">
         <p class="field-note" id="goal-preview"></p>
       </div>
+      <div class="field">
+        <label>本文の幅</label>
+        <div class="radio-row" id="width-row">
+          <label class="radio-pill" data-w="narrow">標準</label>
+          <label class="radio-pill" data-w="wide">広い</label>
+          <label class="radio-pill" data-w="full">最大</label>
+        </div>
+        <p class="field-note" id="width-note"></p>
+      </div>
       <div class="modal-actions">
         <button class="btn btn-ghost" id="settings-cancel">キャンセル</button>
         <button class="btn btn-primary" id="settings-save">保存</button>
       </div>`;
+
+    // 本文の幅はその場で反映して、見ながら選べるようにする
+    const widthNotes = {
+      narrow: '1行あたり約60文字。読みやすさを優先します。',
+      wide: '1行あたり約80文字。広い画面の余白を減らします。',
+      full: '画面の横幅をほぼ使い切ります。ワイドモニター向け。',
+    };
+    const paintWidth = (key) => {
+      modal.querySelectorAll('#width-row .radio-pill').forEach((p) => {
+        p.classList.toggle('on', p.dataset.w === key);
+      });
+      $('#width-note').textContent = widthNotes[key];
+    };
+    paintWidth(currentReadingWidth());
+    modal.querySelectorAll('#width-row .radio-pill').forEach((pill) => {
+      pill.addEventListener('click', () => {
+        applyReadingWidth(pill.dataset.w);
+        paintWidth(pill.dataset.w);
+      });
+    });
 
     const input = $('#goal-value');
     const preview = $('#goal-preview');

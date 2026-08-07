@@ -38,8 +38,10 @@
   --topbar-h: 52px;
   --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
 
-  /* 本文は画面の横幅を活かして広げる。上限は行が長くなりすぎない範囲で */
-  --reading-width: 980px;
+  /* 本文の幅。設定(標準/広い/最大)で切り替えられる。既定は画面を広く使う */
+  --reading-width: 1800px;
+  --layout-max: 100%;
+  --prose-size: 16.5px;
   --sidebar-w: 208px;
   --rightpanel-w: 248px;
   --notepad-w: 340px;
@@ -163,7 +165,7 @@ svg { display: block; }
   display: grid;
   grid-template-columns: var(--sidebar-w) minmax(0, 1fr) var(--rightpanel-w);
   min-height: calc(100dvh - var(--topbar-h));
-  max-width: 2200px;
+  max-width: var(--layout-max);
   margin: 0 auto;
   transition: grid-template-columns 0.3s var(--ease);
 }
@@ -342,9 +344,10 @@ body.focus-mode .sidebar, body.focus-mode .rightpanel { opacity: 0; pointer-even
 .home-figure { margin: 26px 0 0; }
 .art-home { width: 100%; height: auto; }
 
-/* 章ヒーロー(扉絵) */
+/* 章ヒーロー(扉絵)— 本文を広げても引き伸ばされすぎないよう上限をつける */
 .hero-figure {
-  margin: 0 0 34px;
+  margin: 0 auto 34px;
+  max-width: 900px;
   padding: 18px 10px 10px;
   border-radius: var(--radius-lg);
   background: linear-gradient(180deg, var(--accent-tint), transparent 82%);
@@ -402,7 +405,7 @@ body.focus-mode .sidebar, body.focus-mode .rightpanel { opacity: 0; pointer-even
 
 /* 本文タイポグラフィ:明朝・行間1.9・1文1行 */
 .prose {
-  font-family: var(--serif); font-size: 16px; line-height: 1.9; letter-spacing: 0.03em;
+  font-family: var(--serif); font-size: var(--prose-size); line-height: 1.9; letter-spacing: 0.03em;
   /* PDF由来の長い英数字列(製品名・規格名・表の列など)が
      折り返せずに横へあふれるのを防ぐ */
   overflow-wrap: anywhere;

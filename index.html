@@ -28,11 +28,22 @@
   </noscript>
   <link rel="stylesheet" href="css/app.css">
   <script>
-    // 初回描画前にテーマを確定(ちらつき防止)
+    // 初回描画前にテーマと本文幅を確定(ちらつき防止)
     (function () {
       var pref = localStorage.getItem('theme');
       var dark = pref ? pref === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
       document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+
+      var W = {
+        narrow: ['980px', '2200px', '16px'],
+        wide:   ['1320px', '2400px', '16.5px'],
+        full:   ['1800px', '100%', '17px'],
+      };
+      var w = W[localStorage.getItem('reading-width')] || W.full;
+      var s = document.documentElement.style;
+      s.setProperty('--reading-width', w[0]);
+      s.setProperty('--layout-max', w[1]);
+      s.setProperty('--prose-size', w[2]);
     })();
   </script>
 </head>
