@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>DC運用ガイド 読本</title>
+  <meta name="description" content="JDCC データセンター運用ガイドブック(第2版)を毎日少しずつ読み進めるための学習アプリ">
+  <meta name="theme-color" content="#FAF9F7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#151619" media="(prefers-color-scheme: dark)">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="DC運用読本">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="css/app.css">
+  <script>
+    // 初回描画前にテーマを確定(ちらつき防止)
+    (function () {
+      var pref = localStorage.getItem('theme');
+      var dark = pref ? pref === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    })();
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#main">本文へ移動</a>
+
+  <header class="topbar" id="topbar">
+    <button class="icon-btn nav-toggle" id="btn-drawer" aria-label="章一覧を開く">
+      <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+    <a class="brand" href="#/">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+        <rect x="5" y="4" width="22" height="24" rx="2.5"/>
+        <path d="M11 11h10M11 16h10M11 21h6"/>
+      </svg>
+      <span class="brand-text"><strong>DC運用ガイド</strong><small>読本</small></span>
+    </a>
+    <div class="topbar-quota" id="topbar-quota" hidden>
+      <div class="quota-track"><div class="quota-fill" id="quota-fill"></div></div>
+      <span class="quota-label" id="quota-label"></span>
+    </div>
+    <nav class="topbar-nav" aria-label="ページ">
+      <a href="#/" data-nav="home" class="icon-btn" aria-label="章一覧" title="章一覧">
+        <svg viewBox="0 0 24 24"><path d="M5 4h14v16l-7-4-7 4z"/></svg>
+      </a>
+      <a href="#/glossary" data-nav="glossary" class="icon-btn" aria-label="用語集" title="用語集">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+      </a>
+      <a href="#/highlights" data-nav="highlights" class="icon-btn" aria-label="マーカー一覧" title="マーカー一覧">
+        <svg viewBox="0 0 24 24"><path d="M9 15l-4 5h6l1-2M9 15L18 4l3 3-9 11M9 15l3 3"/></svg>
+      </a>
+      <a href="#/notes" data-nav="notes" class="icon-btn" aria-label="メモ一覧" title="メモ一覧">
+        <svg viewBox="0 0 24 24"><path d="M5 4h14v13l-4 3H5z"/><path d="M15 20v-3h4"/></svg>
+      </a>
+    </nav>
+    <div class="topbar-tools">
+      <button class="icon-btn" id="btn-focus" aria-label="集中モード" title="集中モード">
+        <svg viewBox="0 0 24 24"><path d="M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5"/></svg>
+      </button>
+      <button class="icon-btn" id="btn-theme" aria-label="表示テーマ切り替え" title="テーマ">
+        <svg viewBox="0 0 24 24" class="theme-icon-light"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>
+        <svg viewBox="0 0 24 24" class="theme-icon-dark"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5z"/></svg>
+      </button>
+      <button class="icon-btn" id="btn-settings" aria-label="学習設定" title="学習設定">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v3M12 18.2v3M2.8 12h3M18.2 12h3M5.5 5.5l2.1 2.1M16.4 16.4l2.1 2.1M18.5 5.5l-2.1 2.1M7.6 16.4l-2.1 2.1"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="layout" id="layout">
+    <aside class="sidebar" id="sidebar" aria-label="章一覧">
+      <div class="sidebar-inner" id="sidebar-inner"></div>
+    </aside>
+    <div class="drawer-backdrop" id="drawer-backdrop"></div>
+    <main class="main" id="main" tabindex="-1"></main>
+    <aside class="rightpanel" id="rightpanel" aria-label="補助情報">
+      <div class="rightpanel-inner" id="rightpanel-inner"></div>
+    </aside>
+  </div>
+
+  <div class="popover" id="popover" role="dialog" hidden></div>
+  <div class="sheet-backdrop" id="sheet-backdrop" hidden></div>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" hidden></div>
+  <div class="modal-backdrop" id="modal-backdrop" hidden>
+    <div class="modal" id="modal" role="dialog" aria-modal="true"></div>
+  </div>
+  <div class="selection-tool" id="selection-tool" hidden>
+    <button id="btn-mark">
+      <svg viewBox="0 0 24 24"><path d="M9 15l-4 5h6l1-2M9 15L18 4l3 3-9 11M9 15l3 3"/></svg>
+      マーカー
+    </button>
+  </div>
+  <div class="toast" id="toast" hidden></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
