@@ -428,6 +428,27 @@ body.focus-mode .sidebar, body.focus-mode .rightpanel { opacity: 0; pointer-even
   scroll-margin-top: calc(var(--topbar-h) + 24px);
 }
 .para .s { display: block; }
+
+/* 強調行 — 原文でシンボル記号(➢ など)に続けて強調されていた項目。
+   藍のアクセントと下げマーカーで、静かな紙面のまま目に留まるように */
+.para .s.em {
+  position: relative;
+  padding-left: 1.15em;
+  color: var(--accent-strong);
+  font-weight: 500;
+  margin: 0.15em 0;
+}
+.para .s.em::before {
+  content: "";
+  position: absolute;
+  left: 0.1em;
+  top: 0.78em;
+  width: 0.5em;
+  height: 0.5em;
+  border-top: 1.5px solid var(--accent);
+  border-right: 1.5px solid var(--accent);
+  transform: rotate(45deg) scale(0.72);
+}
 .para.flash { animation: para-flash 2s var(--ease); }
 @keyframes para-flash {
   0%, 35% { background: var(--accent-soft); box-shadow: 0 0 0 8px var(--accent-soft); border-radius: 4px; }

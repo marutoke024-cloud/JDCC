@@ -188,6 +188,44 @@ function stripChapterTitle(text, chapterNo) {
   return ws > 0 && ws <= 40 ? rest.slice(ws + 1).trim() : rest.trim();
 }
 
+/* ---------- 強調マーカー(PDFシンボルフォント由来の私用領域文字) ---------- */
+
+/**
+ * 原文には U+F09F(矢印) U+F0FC(チェック) U+F06C(丸) U+F06E(四角)など、
+ * PDFのシンボルフォントに由来する私用領域文字が約1900箇所含まれる。
+ * 原文の紙面では、これらの記号に続く一文が強調項目として組まれていた。
+ * 表示ではこの文字を取り除き、続くテキストを強調行として描画する。
+ */
+const RE_EM_MARK = /[\uE000-\uF8FF]/;
+
+/** テキストを強調マーカーで分割 → [{t, em}] のセグメント列にする */
+function splitEmphasis(text) {
+  if (!RE_EM_MARK.test(text)) return [{ t: text, em: false }];
+  const parts = text.split(new RegExp(RE_EM_MARK.source, 'g'));
+  const out = [];
+  parts.forEach((p, i) => {
+    const t = p.trim();
+    if (t) out.push({ t, em: i > 0 });
+  });
+  return out.length ? out : [{ t: '', em: false }];
+}
+
+/* ---------- 図表キャプション・出典 ---------- */
+
+/**
+ * 「図 2-3 …」「表 10-1 …」のようなキャプション行。
+ * 図版そのものは原文データに存在しないため、テキストは表示せず、
+ * 内容に合ったイラストへ置き換える(reader側で描画)。
+ */
+export function isFigureCaption(text) {
+  return /^[\s　]*[(（]?(図|表)[\s　]*\d+[-−–.\d]*/.test(text.trim());
+}
+
+/** 「出典：…」だけの行(掲載元の案内)— 図版がないため表示しない */
+function isSourceLine(text) {
+  return /^[\s　]*[(（]?出[典展][:：]/.test(text.trim());
+}
+
 /** 段落ID(データ設計 §5): ch{2桁}-p{4桁} */
 export function paragraphId(chapterNo, index) {
   return `ch${String(chapterNo).padStart(2, '0')}-p${String(index).padStart(4, '0')}`;
@@ -241,17 +279,24 @@ export function formatChapter(chapterData) {
     const target = inAppendix ? appendix : blocks;
 
     const pushPara = (raw) => {
-      // 表・箇条書き行のスペースは列区切りなので詰めない
-      const body = m.table ? raw : tightenSpaces(raw);
-      const sentences = m.table ? [body] : splitSentences(body);
-      if (!sentences.length || !body.trim()) return;
+      // 強調マーカー(私用領域文字)でセグメントに分け、
+      // マーカー以降のセグメントは強調行として扱う
+      const sentences = [];
+      for (const seg of splitEmphasis(raw)) {
+        // 表・箇条書き行のスペースは列区切りなので詰めない
+        const body = m.table ? seg.t : tightenSpaces(seg.t);
+        if (!body.trim()) continue;
+        const parts = m.table ? [body] : splitSentences(body);
+        for (const t of parts) sentences.push({ t, em: seg.em });
+      }
+      if (!sentences.length) return;
       target.push({
         type: 'para',
         id: pid,
         pid,
         table: !!m.table,
         sentences,
-        text: sentences.join(''),
+        text: sentences.map((s) => s.t).join(''),
         chars: m.chars,
       });
       if (!inAppendix) charTotal += m.chars;
@@ -260,6 +305,16 @@ export function formatChapter(chapterData) {
     let text = m.text;
     // 章冒頭に混ざる「第N章 タイトル」は本文から取り除く
     if (mi === 0) text = stripChapterTitle(text, no);
+
+    // 図表キャプション・出典行は本文として表示せず、
+    // reader側で内容に合ったイラストに置き換える(§: 図版は原文データに存在しない)
+    if (!inAppendix) {
+      if (isFigureCaption(text)) {
+        target.push({ type: 'figure', id: `${pid}-f`, caption: tightenSpaces(text.trim()) });
+        return;
+      }
+      if (isSourceLine(text)) return;
+    }
 
     const h = inAppendix ? null : splitHeading(text, no);
     if (h) {

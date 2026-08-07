@@ -440,7 +440,9 @@ function blockHtml(b) {
     const tag = `h${b.level}`;
     return `<${tag} id="${esc(b.id)}"><span class="h-num">${esc(b.num)}</span><span>${esc(b.text)}</span></${tag}>`;
   }
-  const sentences = b.sentences.map((s) => `<span class="s">${esc(s)}</span>`).join('');
+  const sentences = b.sentences
+    .map((s) => `<span class="s${s.em ? ' em' : ''}">${esc(s.t)}</span>`)
+    .join('');
   return `
     <div class="para" id="${esc(b.pid)}" data-pid="${esc(b.pid)}" data-chars="${b.chars}">
       ${sentences}
@@ -456,15 +458,35 @@ function blockHtml(b) {
  * 同じモチーフの連続は避け、章あたりの枚数も抑えて紙面を静かに保つ。
  */
 function proseHtml(blocks) {
-  const MAX_VIGNETTES = 14;
+  const MAX_HEADING_VIGNETTES = 14;
   let html = '';
   let lastMotif = null;
   let used = 0;
   let firstHeading = true;
+  let sinceLastArt = 99; // 直前の図版からのブロック数(密集を防ぐ)
+
   for (let i = 0; i < blocks.length; i++) {
     const b = blocks[i];
+
+    // 図表キャプションの位置には、内容に合ったイラストを置く
+    if (b.type === 'figure') {
+      const key =
+        matchMotif(b.caption) ||
+        matchMotif(blocks[i - 1]?.type === 'para' ? blocks[i - 1].text.slice(-160) : '') ||
+        lastMotif;
+      // 同じ絵が続く場合や直前に図版を置いたばかりの場合は控える
+      if (key && (key !== lastMotif || sinceLastArt > 6) && sinceLastArt >= 2) {
+        html += `<figure class="vignette" aria-hidden="true">${sectionVignette(key)}</figure>`;
+        lastMotif = key;
+        sinceLastArt = 0;
+      }
+      continue;
+    }
+
     html += blockHtml(b);
-    if (b.type !== 'heading' || used >= MAX_VIGNETTES) continue;
+    sinceLastArt++;
+
+    if (b.type !== 'heading' || used >= MAX_HEADING_VIGNETTES) continue;
     // 章の最初の節は扉絵と近すぎるため挿絵を入れない
     if (firstHeading) {
       firstHeading = false;
@@ -473,10 +495,11 @@ function proseHtml(blocks) {
     // 見出し + 直後の段落テキストからモチーフを決める
     const nextPara = blocks[i + 1]?.type === 'para' ? blocks[i + 1].text : '';
     const key = matchMotif(b.text + ' ' + nextPara.slice(0, 120));
-    if (key && key !== lastMotif) {
+    if (key && key !== lastMotif && sinceLastArt >= 2) {
       html += `<figure class="vignette" aria-hidden="true">${sectionVignette(key)}</figure>`;
       lastMotif = key;
       used++;
+      sinceLastArt = 0;
     }
   }
   return html;
@@ -513,7 +536,7 @@ export async function renderReader(main, no, targetPid) {
       ${
         f.appendix.length
           ? `<section class="appendix"><div class="appendix-label">付 録(学習対象外)</div>${f.appendix
-              .map((b) => (b.type === 'para' ? `<div class="para">${b.sentences.map((s) => `<span class="s">${esc(s)}</span>`).join('')}</div>` : ''))
+              .map((b) => (b.type === 'para' ? `<div class="para">${b.sentences.map((s) => `<span class="s">${esc(s.t)}</span>`).join('')}</div>` : ''))
               .join('')}</section>`
           : ''
       }
