@@ -17,20 +17,24 @@ export const isSupported = !!synth;
 let voices = [];
 let voicesReady = null;
 
+/** 既定で選びたい声。見つかればこれを最優先にする */
+const PREFERRED_VOICE = /sayaka/i;
+
 /** 女性らしさのスコア。既知の女性音声名を優先する */
 const FEMALE_HINTS = [
-  /kyoko/i, /o-ren/i, /otoya/i, // macOS/iOS(Otoyaは男性なので後で減点)
-  /nanami/i, /ayumi/i, /haruka/i, /sayaka/i, /ichiro/i,
+  /kyoko/i, /o-ren/i,
+  /nanami/i, /ayumi/i, /haruka/i, /sayaka/i,
   /female/i, /女性/, /woman/i,
   /google 日本語/i,
 ];
-const MALE_HINTS = [/otoya/i, /ichiro/i, /male/i, /男性/, /hattori/i, /daichi/i];
+const MALE_HINTS = [/otoya/i, /ichiro/i, /male/i, /男性/, /hattori/i, /daichi/i, /keita/i];
 
 function scoreVoice(v) {
   const name = `${v.name} ${v.voiceURI}`;
   let s = 0;
   if (/^ja(-|_)?/i.test(v.lang) || /japan/i.test(v.lang)) s += 100;
   else return -1; // 日本語以外は使わない
+  if (PREFERRED_VOICE.test(name)) s += 200; // 既定の指定声
   if (v.localService) s += 12; // ローカル音声はオフラインでも動き、遅延も小さい
   for (const re of FEMALE_HINTS) if (re.test(name)) s += 20;
   for (const re of MALE_HINTS) if (re.test(name)) s -= 45;
@@ -146,7 +150,7 @@ const st = {
   units: [],
   i: 0,
   playing: false,
-  rate: parseFloat(localStorage.getItem('tts-rate') || '1.05'),
+  rate: parseFloat(localStorage.getItem('tts-rate') || '1.45'),
   voice: null,
   onUnit: null,
   onEnd: null,

@@ -90,7 +90,12 @@ async function route() {
   if (p0 === 'ch' && p1) {
     nav = '';
     const no = parseInt(p1, 10);
-    await renderReader(main(), no, r.params.get('p'));
+    // ?resume=1 のときは、前回閉じた位置まで戻す
+    const resume =
+      r.params.get('resume') && state.lastPosition && state.lastPosition.chapter === no
+        ? state.lastPosition
+        : null;
+    await renderReader(main(), no, r.params.get('p'), resume);
     setRightPanel(readerRightPanel(no));
     bindTocSpy();
   } else if (p0 === 'glossary') {
@@ -196,6 +201,7 @@ function homeRightPanel() {
 async function renderHome() {
   const plan = todayPlan();
   const bm = state.bookmark;
+  const lastPos = state.lastPosition;
 
   const rangeHtml = plan.start
     ? `今日は <span class="range-em">第${plan.start.chapter}章${plan.start.num ? ` ${plan.start.num}` : ''}</span> から
@@ -204,13 +210,20 @@ async function renderHome() {
       ? 'すべての範囲を読み終えています'
       : '未読の範囲はありません';
 
-  const resumeHtml = bm
+  // 前回閉じた位置があればそこへ、なければしおり(最後に読んだ段落)へ戻す
+  const resumeCh = lastPos ? lastPos.chapter : bm?.chapter;
+  const resumeHref = lastPos
+    ? `#/ch/${lastPos.chapter}?resume=1`
+    : bm
+      ? `#/ch/${bm.chapter}?p=${encodeURIComponent(bm.pid)}`
+      : null;
+  const resumeHtml = resumeHref
     ? `
-      <a class="resume-card" href="#/ch/${bm.chapter}?p=${encodeURIComponent(bm.pid)}">
+      <a class="resume-card" href="${resumeHref}">
         <span class="resume-icon"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></svg></span>
         <span class="resume-text">
-          <span class="resume-label">続きから読む</span>
-          <span class="resume-loc">第${bm.chapter}章 ${bm.num ? `${bm.num} ` : ''}${esc(chapterShortTitle(bm.chapter))}</span>
+          <span class="resume-label">${lastPos ? '前回の続きから' : '続きから読む'}</span>
+          <span class="resume-loc">第${resumeCh}章 ${!lastPos && bm?.num ? `${bm.num} ` : ''}${esc(chapterShortTitle(resumeCh))}</span>
         </span>
         <span class="resume-arrow"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></span>
       </a>`
@@ -250,7 +263,7 @@ async function renderHome() {
     <div class="container">
       <section class="home-hero">
         <div class="home-date">${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日(${wd})</div>
-        <h1 class="home-greeting">データセンター運用ガイドブック<br>を、毎日すこしずつ。</h1>
+        <h1 class="home-greeting">データセンター運用ガイドブックを、毎日すこしずつ。</h1>
         <p class="home-sub">全13章・${fmtNum(state.totalChars)}字。今日の分だけ、静かに読み進めましょう。</p>
         <figure class="home-figure">${homeArt()}</figure>
       </section>
@@ -272,6 +285,12 @@ async function renderHome() {
             plan.start
               ? `<a class="btn btn-primary" href="#/ch/${plan.start.chapter}?p=${encodeURIComponent(plan.start.pid)}">
                    <svg viewBox="0 0 24 24"><path d="M8 5l8 7-8 7"/></svg>今日の範囲を読む</a>`
+              : ''
+          }
+          ${
+            lastPos
+              ? `<a class="btn" href="#/ch/${lastPos.chapter}?resume=1">
+                   <svg viewBox="0 0 24 24"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3 4.5V9h4.5"/></svg>前回の続きから</a>`
               : ''
           }
           <button class="btn" id="btn-open-settings">

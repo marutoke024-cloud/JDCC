@@ -15,6 +15,7 @@ export const state = {
   progressMap: new Map(), // 章番号 → {chapter, read:{pid:1}, done}
   settings: null, // {mode:'chars'|'days', value}
   bookmark: null, // {pid, chapter, headingNum}
+  lastPosition: null, // 前回閉じたときの読書位置 {chapter, pid, offset, y, savedAt}
   streak: { count: 0, lastDate: null },
   todayChars: 0,
 };
@@ -34,16 +35,18 @@ export async function loadAll() {
   state.totalChars = 0;
   for (const f of state.formatted.values()) state.totalChars += f.charTotal;
 
-  const [progressAll, settings, bookmark, streak, todayLog] = await Promise.all([
+  const [progressAll, settings, bookmark, streak, todayLog, lastPos] = await Promise.all([
     db.progress.all(),
     db.kv.get('settings'),
     db.kv.get('bookmark'),
     db.kv.get('streak'),
     db.readlog.get(db.todayKey()),
+    db.kv.get('lastPosition'),
   ]);
   state.progressMap = new Map((progressAll || []).map((p) => [p.chapter, p]));
   state.settings = settings || { mode: 'chars', value: 3000 };
   state.bookmark = bookmark || null;
+  state.lastPosition = lastPos || null;
   state.streak = streak || { count: 0, lastDate: null };
   state.todayChars = todayLog ? todayLog.chars : 0;
 }
@@ -209,6 +212,16 @@ export function todayPlan() {
 }
 
 /* ---------- しおり ---------- */
+
+/**
+ * 前回閉じたときの読書位置。
+ * スクロール量(y)だけだと文字サイズや幅を変えたときにずれるため、
+ * 画面上端にいちばん近い段落IDと、その段落からのずれも一緒に持つ。
+ */
+export async function saveLastPosition(chapter, pid, offset, y) {
+  state.lastPosition = { chapter, pid, offset, y, savedAt: Date.now() };
+  await db.kv.set('lastPosition', state.lastPosition);
+}
 
 export async function saveBookmark(no, pid) {
   const f = state.formatted.get(no);

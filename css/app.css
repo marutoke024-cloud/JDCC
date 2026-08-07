@@ -223,9 +223,12 @@ body.focus-mode .sidebar, body.focus-mode .rightpanel { opacity: 0; pointer-even
 /* ---------- ホーム ---------- */
 .home-hero { padding: 46px 0 8px; }
 .home-date { font-size: 12px; letter-spacing: 0.14em; color: var(--ink-soft); margin-bottom: 8px; }
+/* 標語は1行で見せる。狭い画面では収まる大きさまで自動で縮める */
 .home-greeting {
-  font-family: var(--serif); font-size: 26px; font-weight: 600; letter-spacing: 0.02em;
+  font-family: var(--serif); font-weight: 600; letter-spacing: 0.01em;
   line-height: 1.5;
+  font-size: clamp(10px, 3.3vw, 30px);
+  white-space: nowrap;
 }
 .home-sub { color: var(--ink-soft); font-size: 13px; margin-top: 6px; }
 
@@ -996,7 +999,8 @@ body.notepad-open .tts-bar { transform: translateX(calc(-50% - var(--notepad-w) 
   .topbar-quota { display: none; }
   .ch-grid { grid-template-columns: 1fr; }
   .home-hero { padding-top: 30px; }
-  .home-greeting { font-size: 22px; }
+  /* スマホでも1行に収める(ベースの clamp が画面幅に応じて縮める) */
+  .home-greeting { letter-spacing: 0; }
   .reader-title { font-size: 22px; }
   /* 画面が狭いぶん控えめにするが、文字の大きさ設定には追従させる */
   .prose { font-size: calc(var(--prose-size) - 1px); }
@@ -1021,6 +1025,18 @@ body.notepad-open .tts-bar { transform: translateX(calc(-50% - var(--notepad-w) 
   .bottom-nav a svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
   .bottom-nav a.active { color: var(--accent); }
 }
+/* 小さめのスマホ: トップバーのアイコンを詰めて収める */
+@media (max-width: 479px) {
+  .topbar { padding: 0 8px 0 6px; }
+  .topbar-tools { gap: 0; }
+  .icon-btn { width: 32px; height: 32px; }
+  .icon-btn svg { width: 18px; height: 18px; }
+  .brand { gap: 7px; padding-right: 4px; }
+  .brand-text small { display: none; }
+  /* 1カラム表示では集中モードの効果がないため隠す */
+  #btn-focus { display: none; }
+}
+
 @media (min-width: 768px) {
   .bottom-nav { display: none; }
 }

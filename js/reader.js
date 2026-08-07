@@ -4,7 +4,8 @@
  */
 import {
   state, esc, fmtNum, toast,
-  markParagraphRead, saveBookmark, chapterProgress, setChapterDone, chapterShortTitle,
+  markParagraphRead, saveBookmark, saveLastPosition,
+  chapterProgress, setChapterDone, chapterShortTitle,
 } from './state.js';
 import * as db from './db.js';
 import { chapterHero, sectionVignette, matchMotif } from './art.js';
@@ -375,6 +376,56 @@ function observeParagraphs(proseEl, chapterNo) {
   proseEl.querySelectorAll('.para[data-pid]').forEach((p) => currentObserver.observe(p));
 }
 
+/* ============ 読書位置の記録 ============ */
+
+let posTimer = null;
+let posHandler = null;
+
+/** 画面上端にいちばん近い段落と、そこからのずれを求める */
+function currentReadingAnchor() {
+  const paras = document.querySelectorAll('#prose .para[data-pid]');
+  const top = (document.querySelector('.topbar')?.offsetHeight || 52) + 8;
+  let anchor = null;
+  for (const p of paras) {
+    const r = p.getBoundingClientRect();
+    if (r.bottom > top) {
+      anchor = { pid: p.dataset.pid, offset: Math.round(r.top - top) };
+      break;
+    }
+  }
+  return anchor;
+}
+
+/** スクロールを追いかけて、前回位置として保存する */
+function trackReadingPosition(chapterNo) {
+  if (posHandler) removeEventListener('scroll', posHandler);
+  posHandler = () => {
+    clearTimeout(posTimer);
+    posTimer = setTimeout(() => {
+      const a = currentReadingAnchor();
+      if (a) saveLastPosition(chapterNo, a.pid, a.offset, Math.round(scrollY));
+    }, 350);
+  };
+  addEventListener('scroll', posHandler, { passive: true });
+  // 閉じる直前にも取りこぼしなく残す
+  addEventListener('pagehide', () => {
+    const a = currentReadingAnchor();
+    if (a) saveLastPosition(chapterNo, a.pid, a.offset, Math.round(scrollY));
+  });
+}
+
+/** 保存した位置へ戻す。段落IDが基準なので文字サイズを変えていてもずれない */
+export function restoreReadingPosition(pos) {
+  const el = pos.pid ? document.getElementById(pos.pid) : null;
+  if (el) {
+    const top = (document.querySelector('.topbar')?.offsetHeight || 52) + 8;
+    const y = scrollY + el.getBoundingClientRect().top - top - (pos.offset || 0);
+    scrollTo({ top: Math.max(0, y), behavior: 'auto' });
+  } else if (typeof pos.y === 'number') {
+    scrollTo({ top: pos.y, behavior: 'auto' });
+  }
+}
+
 /* ============ 章末サマリー ============ */
 
 async function renderSummaryBox(el, chapterNo) {
@@ -508,7 +559,7 @@ function proseHtml(blocks) {
 
 /* ============ メインの描画 ============ */
 
-export async function renderReader(main, no, targetPid) {
+export async function renderReader(main, no, targetPid, resumePos) {
   currentChapter = no;
   const f = state.formatted.get(no);
   if (!f) {
@@ -602,8 +653,10 @@ export async function renderReader(main, no, targetPid) {
     renderReader(main, no);
   };
 
-  // 指定段落へスクロール
-  if (targetPid) {
+  // 指定段落へスクロール / 前回位置の復元
+  if (resumePos) {
+    requestAnimationFrame(() => restoreReadingPosition(resumePos));
+  } else if (targetPid) {
     requestAnimationFrame(() => {
       const el = document.getElementById(targetPid);
       if (el) {
@@ -615,6 +668,9 @@ export async function renderReader(main, no, targetPid) {
   } else {
     scrollTo(0, 0);
   }
+
+  // この章での読書位置を追いかけて記録する
+  trackReadingPosition(no);
 
   return f;
 }
