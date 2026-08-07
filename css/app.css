@@ -416,9 +416,10 @@ body.focus-mode .sidebar, body.focus-mode .rightpanel { opacity: 0; pointer-even
   margin: 2.6em 0 1em; scroll-margin-top: calc(var(--topbar-h) + 20px);
   display: flex; align-items: baseline; gap: 10px;
 }
-.prose h2 { font-size: 20px; }
-.prose h3 { font-size: 17px; }
-.prose h4 { font-size: 15px; }
+/* 見出しは本文サイズに連動させる(文字の大きさ設定に追従) */
+.prose h2 { font-size: 1.25em; }
+.prose h3 { font-size: 1.06em; }
+.prose h4 { font-size: 0.94em; }
 .h-num { color: var(--accent); font-variant-numeric: tabular-nums; font-weight: 600; flex-shrink: 0; }
 
 .para {
@@ -536,7 +537,7 @@ mark.hl {
 .appendix {
   margin-top: 3em; padding-top: 1.5em;
   border-top: 1px dashed var(--hairline-strong);
-  color: var(--ink-soft); font-size: 14px;
+  color: var(--ink-soft); font-size: calc(var(--prose-size) * 0.88);
   /* 索引のドットリーダーなど、極端に長い連続文字を折り返す */
   overflow-wrap: anywhere;
 }
@@ -897,7 +898,8 @@ body.notepad-open .notepad {
   .home-hero { padding-top: 30px; }
   .home-greeting { font-size: 22px; }
   .reader-title { font-size: 22px; }
-  .prose { font-size: 15.5px; }
+  /* 画面が狭いぶん控えめにするが、文字の大きさ設定には追従させる */
+  .prose { font-size: calc(var(--prose-size) - 1px); }
   .note-pen { right: -6px; opacity: 0.55; }
   .today-card { padding: 18px; }
   .reader { padding-top: 28px; }

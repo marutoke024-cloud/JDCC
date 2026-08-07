@@ -34,16 +34,19 @@
       var dark = pref ? pref === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
       document.documentElement.dataset.theme = dark ? 'dark' : 'light';
 
+      var s = document.documentElement.style;
+
       var W = {
-        narrow: ['980px', '2200px', '16px'],
-        wide:   ['1320px', '2400px', '16.5px'],
-        full:   ['1800px', '100%', '17px'],
+        narrow: ['980px', '2200px'],
+        wide:   ['1320px', '2400px'],
+        full:   ['1800px', '100%'],
       };
       var w = W[localStorage.getItem('reading-width')] || W.full;
-      var s = document.documentElement.style;
       s.setProperty('--reading-width', w[0]);
       s.setProperty('--layout-max', w[1]);
-      s.setProperty('--prose-size', w[2]);
+
+      var F = { small: '15px', medium: '16.5px', large: '18.5px' };
+      s.setProperty('--prose-size', F[localStorage.getItem('font-size')] || F.medium);
     })();
   </script>
 </head>

@@ -25,11 +25,11 @@ applyTheme();
 
 /* ============ 本文の幅 ============ */
 
-// [本文の上限, レイアウトの上限, 本文の文字サイズ]
+// [本文の上限, レイアウトの上限]
 const READING_WIDTHS = {
-  narrow: ['980px', '2200px', '16px'],
-  wide: ['1320px', '2400px', '16.5px'],
-  full: ['1800px', '100%', '17px'],
+  narrow: ['980px', '2200px'],
+  wide: ['1320px', '2400px'],
+  full: ['1800px', '100%'],
 };
 
 function currentReadingWidth() {
@@ -43,7 +43,20 @@ function applyReadingWidth(key) {
   const s = document.documentElement.style;
   s.setProperty('--reading-width', w[0]);
   s.setProperty('--layout-max', w[1]);
-  s.setProperty('--prose-size', w[2]);
+}
+
+/* ============ 本文の文字サイズ ============ */
+
+const FONT_SIZES = { small: '15px', medium: '16.5px', large: '18.5px' };
+
+function currentFontSize() {
+  const k = localStorage.getItem('font-size');
+  return FONT_SIZES[k] ? k : 'medium';
+}
+
+function applyFontSize(key) {
+  localStorage.setItem('font-size', key);
+  document.documentElement.style.setProperty('--prose-size', FONT_SIZES[key] || FONT_SIZES.medium);
 }
 
 /* ============ ルーター ============ */
@@ -483,6 +496,15 @@ function openSettings() {
         </div>
         <p class="field-note" id="width-note"></p>
       </div>
+      <div class="field">
+        <label>文字の大きさ</label>
+        <div class="radio-row" id="font-row">
+          <label class="radio-pill" data-f="small" style="font-size:11.5px">小</label>
+          <label class="radio-pill" data-f="medium" style="font-size:13px">標準</label>
+          <label class="radio-pill" data-f="large" style="font-size:15px">大</label>
+        </div>
+        <p class="field-note" id="font-note"></p>
+      </div>
       <div class="modal-actions">
         <button class="btn btn-ghost" id="settings-cancel">キャンセル</button>
         <button class="btn btn-primary" id="settings-save">保存</button>
@@ -505,6 +527,26 @@ function openSettings() {
       pill.addEventListener('click', () => {
         applyReadingWidth(pill.dataset.w);
         paintWidth(pill.dataset.w);
+      });
+    });
+
+    // 文字の大きさも、その場で反映して見ながら選べるようにする
+    const fontNotes = {
+      small: '本文 15px。1画面に多くを収めたいとき。',
+      medium: '本文 16.5px。長く読んでも疲れにくい標準。',
+      large: '本文 18.5px。大きめの文字でゆったり読みたいとき。',
+    };
+    const paintFont = (key) => {
+      modal.querySelectorAll('#font-row .radio-pill').forEach((p) => {
+        p.classList.toggle('on', p.dataset.f === key);
+      });
+      $('#font-note').textContent = fontNotes[key];
+    };
+    paintFont(currentFontSize());
+    modal.querySelectorAll('#font-row .radio-pill').forEach((pill) => {
+      pill.addEventListener('click', () => {
+        applyFontSize(pill.dataset.f);
+        paintFont(pill.dataset.f);
       });
     });
 
