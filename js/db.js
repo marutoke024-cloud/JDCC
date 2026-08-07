@@ -145,6 +145,10 @@ export const summaries = {
     await tx('summaries', 'readwrite', (st) => st.put(rec));
     notify('summaries');
   },
+  async remove(chapter) {
+    await tx('summaries', 'readwrite', (st) => st.delete(chapter));
+    notify('summaries');
+  },
 };
 
 /* ---- 日次読了ログ(ノルマ達成度・ストリーク) ---- */

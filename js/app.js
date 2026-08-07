@@ -516,11 +516,82 @@ function bindTocSpy() {
 
 function closeDrawer() {
   document.body.classList.remove('drawer-open');
+  document.body.classList.remove('panel-open');
+}
+
+/* ============ メモパッド ============ */
+
+let notepadTimer = null;
+
+async function initNotepad() {
+  const body = $('#notepad-body');
+  const status = $('#notepad-status');
+  const count = $('#notepad-count');
+
+  const saved = await db.kv.get('notepad');
+  body.value = saved || '';
+  const updateCount = () => (count.textContent = `${fmtNum(body.value.length)} 字`);
+  updateCount();
+
+  body.addEventListener('input', () => {
+    updateCount();
+    status.textContent = '入力中…';
+    status.style.opacity = '1';
+    clearTimeout(notepadTimer);
+    notepadTimer = setTimeout(async () => {
+      await db.kv.set('notepad', body.value);
+      status.textContent = '保存しました';
+      setTimeout(() => (status.style.opacity = '0'), 1400);
+    }, 600);
+  });
+
+  $('#notepad-close').onclick = () => toggleNotepad(false);
+  $('#notepad-clear').onclick = async () => {
+    if (!body.value.trim() || !confirm('メモパッドの内容をすべて消去しますか?')) return;
+    body.value = '';
+    updateCount();
+    await db.kv.set('notepad', '');
+    toast('メモパッドを消去しました');
+  };
+
+  if (localStorage.getItem('notepad-open')) toggleNotepad(true);
+}
+
+let notepadHideTimer = null;
+
+function toggleNotepad(open) {
+  const el = $('#notepad');
+  const on = open ?? !document.body.classList.contains('notepad-open');
+  $('#btn-notepad').classList.toggle('active', on);
+  localStorage.setItem('notepad-open', on ? '1' : '');
+  clearTimeout(notepadHideTimer);
+
+  if (on) {
+    // 閉じている間は DOM から外しておく(画面幅の計算に影響させないため)
+    el.hidden = false;
+    requestAnimationFrame(() => {
+      document.body.classList.add('notepad-open');
+      setTimeout(() => $('#notepad-body').focus(), 320);
+    });
+  } else {
+    document.body.classList.remove('notepad-open');
+    notepadHideTimer = setTimeout(() => {
+      if (!document.body.classList.contains('notepad-open')) el.hidden = true;
+    }, 340);
+  }
 }
 
 function bindChrome() {
   $('#btn-drawer').onclick = () => document.body.classList.toggle('drawer-open');
-  $('#drawer-backdrop').onclick = closeDrawer;
+  $('#drawer-backdrop').onclick = () => {
+    closeDrawer();
+    document.body.classList.remove('panel-open');
+  };
+  $('#btn-panel').onclick = () => document.body.classList.toggle('panel-open');
+  $('#btn-notepad').onclick = () => toggleNotepad();
+  $('#rightpanel').addEventListener('click', (e) => {
+    if (e.target.closest('a')) document.body.classList.remove('panel-open');
+  });
   $('#sidebar').addEventListener('click', (e) => {
     if (e.target.closest('a')) closeDrawer();
   });
@@ -594,6 +665,7 @@ async function boot() {
   }
 
   bindChrome();
+  initNotepad();
   addEventListener('hashchange', route);
   document.addEventListener('progress-changed', () => {
     updateQuotaBar();

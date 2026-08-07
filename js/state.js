@@ -9,6 +9,7 @@ export const state = {
   chapters: [], // 原文(読み取り専用)
   formatted: new Map(), // 章番号 → 整形済み表示データ
   glossary: [],
+  baseSummaries: {}, // 章番号 → 読解サマリー(原文外)
   totalChars: 0,
   isSample: false,
   progressMap: new Map(), // 章番号 → {chapter, read:{pid:1}, done}
@@ -19,12 +20,15 @@ export const state = {
 };
 
 export async function loadAll() {
-  const [chaptersRes, glossaryRes] = await Promise.all([
+  const [chaptersRes, glossaryRes, summariesRes] = await Promise.all([
     fetch('data/chapters.json'),
     fetch('data/glossary.json'),
+    fetch('data/summaries.json'),
   ]);
   state.chapters = await chaptersRes.json();
   state.glossary = await glossaryRes.json();
+  const sum = await summariesRes.json();
+  state.baseSummaries = sum.chapters || {};
   state.isSample = state.chapters.some((c) => c._sample);
   state.formatted = formatAll(state.chapters);
   state.totalChars = 0;

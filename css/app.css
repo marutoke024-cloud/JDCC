@@ -38,9 +38,11 @@
   --topbar-h: 52px;
   --ease: cubic-bezier(0.25, 0.1, 0.25, 1);
 
-  --reading-width: 680px;
-  --sidebar-w: 240px;
-  --rightpanel-w: 280px;
+  /* 本文は画面の横幅を活かして広げる。上限は行が長くなりすぎない範囲で */
+  --reading-width: 980px;
+  --sidebar-w: 208px;
+  --rightpanel-w: 248px;
+  --notepad-w: 340px;
 
   color-scheme: light;
 }
@@ -73,7 +75,12 @@
 /* ---------- ベース ---------- */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
-html { -webkit-text-size-adjust: 100%; }
+html {
+  -webkit-text-size-adjust: 100%;
+  /* 画面外に退避しているメモパッドが横スクロールを生まないようにする
+     (clip は sticky なトップバーを壊さない) */
+  overflow-x: clip;
+}
 
 body {
   background: var(--bg);
@@ -178,7 +185,8 @@ body.focus-mode .layout { grid-template-columns: 0 minmax(0, 1fr) 0; }
 body.focus-mode .sidebar, body.focus-mode .rightpanel { opacity: 0; pointer-events: none; border-color: transparent; }
 .sidebar, .rightpanel { transition: opacity 0.25s var(--ease), border-color 0.25s var(--ease); }
 
-.main { min-width: 0; padding: 0 24px 120px; outline: none; }
+/* 左右の余白は、段落右外に出る余白ノートのペンが収まる幅を確保する */
+.main { min-width: 0; padding: 0 44px 120px; outline: none; }
 
 /* 本文カラムは常に中央固定・幅上限つき(ウルトラワイド対応) */
 .container { max-width: var(--reading-width); margin: 0 auto; }
@@ -393,7 +401,12 @@ body.focus-mode .sidebar, body.focus-mode .rightpanel { opacity: 0; pointer-even
 .reader-rule { border: 0; border-top: 1px solid var(--hairline); margin: 26px 0 34px; }
 
 /* 本文タイポグラフィ:明朝・行間1.9・1文1行 */
-.prose { font-family: var(--serif); font-size: 16px; line-height: 1.9; letter-spacing: 0.03em; }
+.prose {
+  font-family: var(--serif); font-size: 16px; line-height: 1.9; letter-spacing: 0.03em;
+  /* PDF由来の長い英数字列(製品名・規格名・表の列など)が
+     折り返せずに横へあふれるのを防ぐ */
+  overflow-wrap: anywhere;
+}
 
 .prose h2, .prose h3, .prose h4 {
   font-family: var(--sans); font-weight: 700; line-height: 1.5;
@@ -493,11 +506,14 @@ mark.hl {
   font-size: 10px; letter-spacing: 0.12em; color: var(--accent);
   border: 1px solid var(--accent-line); border-radius: 99px; padding: 1.5px 9px;
 }
-.summary-head .btn-sm { margin-left: auto; }
+.summary-source { font-size: 10.5px; color: var(--ink-faint); letter-spacing: 0.04em; }
+.summary-head .summary-source { margin-left: auto; }
+.summary-head .btn-sm { margin-left: 0; }
 .summary-list { list-style: none; }
 .summary-list li {
   position: relative; padding-left: 18px; margin-bottom: 7px;
   font-size: 13.5px; line-height: 1.75;
+  overflow-wrap: anywhere;
 }
 .summary-list li::before {
   content: ""; position: absolute; left: 2px; top: 0.72em;
@@ -518,6 +534,8 @@ mark.hl {
   margin-top: 3em; padding-top: 1.5em;
   border-top: 1px dashed var(--hairline-strong);
   color: var(--ink-soft); font-size: 14px;
+  /* 索引のドットリーダーなど、極端に長い連続文字を折り返す */
+  overflow-wrap: anywhere;
 }
 .appendix-label { font-family: var(--sans); font-size: 11px; letter-spacing: 0.16em; color: var(--ink-faint); margin-bottom: 1.2em; }
 
@@ -577,7 +595,7 @@ mark.hl {
 }
 .gl-term { font-size: 15.5px; font-weight: 700; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .gl-reading { font-size: 11.5px; font-weight: 400; color: var(--ink-faint); letter-spacing: 0.06em; }
-.gl-desc { font-size: 13.5px; line-height: 1.85; color: var(--ink); margin-top: 7px; }
+.gl-desc { font-size: 13.5px; line-height: 1.85; color: var(--ink); margin-top: 7px; overflow-wrap: anywhere; }
 .gl-occ { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
 .gl-occ-link {
   font-size: 11.5px; color: var(--accent);
@@ -603,6 +621,7 @@ mark.hl {
 .item-loc { font-size: 11px; letter-spacing: 0.06em; color: var(--accent); font-weight: 600; margin-bottom: 6px; font-variant-numeric: tabular-nums; }
 .mark-quote {
   font-family: var(--serif); font-size: 14px; line-height: 1.85;
+  overflow-wrap: anywhere;
 }
 .mark-quote mark { background: var(--accent-marker); color: inherit; border-radius: 2px; }
 .note-quote { font-family: var(--serif); font-size: 12.5px; color: var(--ink-soft); line-height: 1.7; margin-bottom: 8px; }
@@ -614,6 +633,82 @@ mark.hl {
 }
 .empty-state svg { width: 34px; height: 34px; margin: 0 auto 14px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; opacity: 0.7; }
 .empty-state p { font-size: 13px; line-height: 1.8; }
+
+/* ---------- メモパッド(右側・開閉式) ---------- */
+.panel-toggle { display: none; }
+
+/* 閉じているときは幅を 0 に畳む。画面外へ退避させないので、
+   モバイルで横スクロールやビューポートの拡張を招かない。
+   中身は固定幅の .notepad-inner に入れて、開閉中の折り返しのガタつきを防ぐ。 */
+.notepad {
+  position: fixed; right: 0; top: var(--topbar-h); bottom: 0; z-index: 70;
+  width: 0;
+  overflow: hidden;
+  background: var(--bg-raised);
+  border-left: 0 solid var(--hairline);
+  box-shadow: none;
+  transition: width 0.3s var(--ease), border-left-width 0.3s var(--ease), box-shadow 0.3s var(--ease);
+}
+body.notepad-open .notepad {
+  width: var(--notepad-w);
+  border-left-width: 1px;
+  box-shadow: var(--shadow-lg);
+}
+.notepad-inner {
+  width: var(--notepad-w);
+  height: 100%;
+  display: flex; flex-direction: column;
+}
+
+.notepad-head {
+  display: flex; align-items: center; gap: 9px;
+  padding: 12px 10px 12px 18px;
+  border-bottom: 1px solid var(--hairline);
+  flex-shrink: 0;
+}
+.notepad-icon { width: 16px; height: 16px; fill: none; stroke: var(--accent); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.notepad-title { font-size: 12.5px; font-weight: 700; letter-spacing: 0.06em; }
+.notepad-status { margin-left: auto; font-size: 10.5px; color: var(--ink-faint); transition: opacity 0.3s var(--ease); }
+
+#notepad-body {
+  flex: 1; width: 100%; resize: none;
+  border: 0; outline: none; background: transparent; color: var(--ink);
+  padding: 16px 18px;
+  font: 13.5px/1.95 var(--sans);
+  letter-spacing: 0.01em;
+}
+#notepad-body::placeholder { color: var(--ink-faint); line-height: 1.9; }
+
+.notepad-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px 8px 18px;
+  border-top: 1px solid var(--hairline);
+  font-size: 11px; color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/* メモパッドを開いている間は本文を左へ寄せ、隠れないようにする */
+@media (min-width: 768px) {
+  body.notepad-open .layout { padding-right: var(--notepad-w); }
+  .layout { transition: padding-right 0.3s var(--ease); }
+}
+
+/* 3カラム時はさらに右パネルを畳んで、本文の幅を保つ */
+@media (min-width: 1500px) {
+  body.notepad-open .layout {
+    grid-template-columns: var(--sidebar-w) minmax(0, 1fr) 0;
+  }
+  body.notepad-open .rightpanel { opacity: 0; pointer-events: none; border-color: transparent; }
+  .layout { transition: padding-right 0.3s var(--ease), grid-template-columns 0.3s var(--ease); }
+}
+@media (max-width: 767px) {
+  .notepad { top: 0; }
+  body.notepad-open .notepad { width: 100vw; }
+  .notepad-inner { width: 100vw; }
+  .notepad-head { padding-top: calc(12px + env(safe-area-inset-top)); }
+  .notepad-foot { padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
+}
 
 /* ---------- ポップオーバー(用語解説) ---------- */
 .popover {
@@ -744,9 +839,31 @@ mark.hl {
 
 /* ---------- レスポンシブ ---------- */
 
-/* iPad: 2カラム(章一覧はドロワー) */
-@media (max-width: 1023px) {
-  .layout { grid-template-columns: minmax(0, 1fr) var(--rightpanel-w); }
+/* パネルは、本文の幅を削らずに置ける広さになってから出す。
+   〜1279px: 本文のみ / 1280〜1499px: 章一覧 + 本文 / 1500px〜: 3カラム */
+
+/* 右パネル(目次・進捗)は 1500px 未満ではドロワーにする */
+@media (max-width: 1499px) {
+  .layout { grid-template-columns: var(--sidebar-w) minmax(0, 1fr); }
+  .rightpanel {
+    position: fixed; right: 0; top: 0; bottom: 0; z-index: 98;
+    width: min(320px, 86vw);
+    height: 100dvh;
+    background: var(--bg);
+    border-left: 1px solid var(--hairline);
+    transform: translateX(102%);
+    transition: transform 0.28s var(--ease);
+  }
+  body.panel-open .rightpanel { transform: none; box-shadow: var(--shadow-lg); opacity: 1; pointer-events: auto; }
+  .rightpanel-inner { padding-top: 24px; }
+  .panel-toggle { display: inline-flex; }
+  .drawer-backdrop { display: none; }
+  body.panel-open .drawer-backdrop { display: block; z-index: 97; }
+}
+
+/* 章一覧も 1280px 未満ではドロワーにし、本文を全幅で使う */
+@media (max-width: 1279px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
   .sidebar {
     position: fixed; left: 0; top: 0; bottom: 0; z-index: 98;
     width: min(300px, 84vw);
@@ -758,11 +875,12 @@ mark.hl {
     box-shadow: none;
   }
   body.drawer-open .sidebar { transform: none; box-shadow: var(--shadow-lg); opacity: 1; pointer-events: auto; }
-  .drawer-backdrop { display: none; }
   body.drawer-open .drawer-backdrop { display: block; z-index: 97; }
+
   .sidebar-inner { padding-top: 24px; }
   .nav-toggle { display: inline-flex; }
   .topbar-quota { flex: 0 1 180px; margin-left: 8px; }
+  .main { padding: 0 42px 120px; }
 }
 
 /* スマホ: 1カラム */

@@ -378,18 +378,24 @@ function observeParagraphs(proseEl, chapterNo) {
 
 async function renderSummaryBox(el, chapterNo) {
   const rec = await db.summaries.get(chapterNo);
-  const items = rec?.items || [];
+  const base = state.baseSummaries[String(chapterNo)] || [];
+  const edited = !!rec?.items;
+  const items = edited ? rec.items : base;
+
   el.innerHTML = `
     <div class="summary-head">
       <span class="summary-title">この章のまとめ</span>
       <span class="summary-badge">原文外</span>
-      <button class="btn btn-sm btn-ghost" data-act="edit">${items.length ? '編集' : '書く'}</button>
+      <span class="summary-source">${edited ? '自分で編集' : '本文の読解による要約'}</span>
+      <button class="btn btn-sm btn-ghost" data-act="edit">編集</button>
+      ${edited && base.length ? '<button class="btn btn-sm btn-ghost" data-act="reset">元に戻す</button>' : ''}
     </div>
     ${
       items.length
         ? `<ul class="summary-list">${items.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>`
-        : '<p class="summary-empty">この章の要点を自分の言葉でまとめておくと、復習のときに役立ちます。</p>'
+        : '<p class="summary-empty">この章のまとめはまだありません。</p>'
     }`;
+
   el.querySelector('[data-act="edit"]').onclick = () => {
     el.innerHTML = `
       <div class="summary-head">
@@ -415,6 +421,16 @@ async function renderSummaryBox(el, chapterNo) {
       renderSummaryBox(el, chapterNo);
     };
   };
+
+  const resetBtn = el.querySelector('[data-act="reset"]');
+  if (resetBtn) {
+    resetBtn.onclick = async () => {
+      if (!confirm('編集内容を破棄して、もとのまとめに戻しますか?')) return;
+      await db.summaries.remove(chapterNo);
+      toast('もとのまとめに戻しました');
+      renderSummaryBox(el, chapterNo);
+    };
+  }
 }
 
 /* ============ ブロック描画 ============ */
