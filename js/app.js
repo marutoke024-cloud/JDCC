@@ -551,10 +551,65 @@ function openSettings() {
         </div>
         <p class="field-note" id="font-note"></p>
       </div>
+      <div class="field" id="tts-field" ${tts.isSupported ? '' : 'hidden'}>
+        <label>読み上げの声と速度</label>
+        <div class="voice-list" id="voice-list"></div>
+        <div class="voice-rate">
+          <input type="range" id="set-rate" min="0.6" max="2" step="0.05" value="${tts.ttsState.rate}">
+          <span id="set-rate-val">${Number(tts.ttsState.rate).toFixed(2)}×</span>
+          <button class="btn btn-sm" id="set-preview" type="button">
+            <svg viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z"/></svg>試聴
+          </button>
+        </div>
+        <p class="field-note">選んだ声と速度は保存され、次回からそのまま再生されます。</p>
+      </div>
       <div class="modal-actions">
         <button class="btn btn-ghost" id="settings-cancel">キャンセル</button>
         <button class="btn btn-primary" id="settings-save">保存</button>
       </div>`;
+
+    // 読み上げ: 声を一覧から選び、速度とあわせてその場で保存する
+    if (tts.isSupported) {
+      const rateInput = $('#set-rate');
+      const rateVal = $('#set-rate-val');
+      rateInput.oninput = () => {
+        rateVal.textContent = `${Number(rateInput.value).toFixed(2)}×`;
+      };
+      rateInput.onchange = () => tts.setRate(parseFloat(rateInput.value));
+
+      tts.loadVoices().then(() => {
+        const list = tts.japaneseVoices();
+        const cur = tts.pickVoice();
+        const box = $('#voice-list');
+        if (!list.length) {
+          box.innerHTML = '<p class="field-note">この端末には日本語の音声が見つかりませんでした。</p>';
+          return;
+        }
+        box.innerHTML = list
+          .map(
+            (v) => `
+            <button type="button" class="voice-pill${cur && v.voiceURI === cur.voiceURI ? ' on' : ''}"
+                    data-voice="${esc(v.voiceURI)}">
+              <span class="voice-name">${esc(v.name.replace(/\s*-\s*Japanese.*$/i, ''))}</span>
+              ${tts.isFemaleVoice(v) ? '<span class="voice-tag">女性</span>' : ''}
+            </button>`
+          )
+          .join('');
+        box.querySelectorAll('.voice-pill').forEach((p) => {
+          p.onclick = () => {
+            box.querySelectorAll('.voice-pill').forEach((x) => x.classList.remove('on'));
+            p.classList.add('on');
+            tts.setVoice(p.dataset.voice);
+            tts.preview(p.dataset.voice, parseFloat(rateInput.value));
+          };
+        });
+      });
+
+      $('#set-preview').onclick = () => {
+        const sel = $('#voice-list .voice-pill.on');
+        tts.preview(sel?.dataset.voice, parseFloat($('#set-rate').value));
+      };
+    }
 
     // 本文の幅はその場で反映して、見ながら選べるようにする
     const widthNotes = {

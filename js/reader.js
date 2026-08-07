@@ -105,34 +105,63 @@ function hideTermPopup() {
 }
 
 function bindTermEvents(root) {
-  if (isTouch) {
-    root.addEventListener('click', (e) => {
+  // タッチ/ペンは pointerup で拾う。
+  // click はタップ中に文字選択が始まると発火しないことがあり、
+  // iPadで「タップしても出ない」取りこぼしの原因になる。
+  root.addEventListener(
+    'pointerup',
+    (e) => {
+      if (e.pointerType === 'mouse') return; // マウスはホバーで表示する
       const t = e.target.closest('.term');
-      if (t) {
-        e.preventDefault();
-        showTermPopup(t);
-      }
-    });
-  } else {
-    root.addEventListener('mouseover', (e) => {
-      const t = e.target.closest('.term');
-      if (t) {
-        clearTimeout(popTimer);
-        popTimer = setTimeout(() => showTermPopup(t), 180);
-      }
-    });
-    root.addEventListener('mouseout', (e) => {
-      if (e.target.closest('.term')) {
-        clearTimeout(popTimer);
-        popTimer = setTimeout(() => {
-          if (!popover().matches(':hover')) hideTermPopup();
-        }, 250);
-      }
-    });
-    popover().addEventListener('mouseleave', () => hideTermPopup());
-    document.addEventListener('scroll', hideTermPopup, { passive: true });
-  }
+      if (!t) return;
+      const sel = getSelection();
+      if (sel && !sel.isCollapsed) return; // 文字を選択中なら邪魔しない
+      showTermPopup(t);
+    },
+    true // 途中で止められないよう捕捉フェーズで受ける
+  );
+
+  // マウス: ホバーで表示
+  root.addEventListener('mouseover', (e) => {
+    const t = e.target.closest('.term');
+    if (t) {
+      clearTimeout(popTimer);
+      popTimer = setTimeout(() => showTermPopup(t), 180);
+    }
+  });
+  root.addEventListener('mouseout', (e) => {
+    if (e.target.closest('.term')) {
+      clearTimeout(popTimer);
+      popTimer = setTimeout(() => {
+        if (!popover().matches(':hover')) hideTermPopup();
+      }, 250);
+    }
+  });
+  popover().addEventListener('mouseleave', () => hideTermPopup());
 }
+
+/** 画面のどこかを触れば閉じる。スクロールでも閉じる(位置がずれるため) */
+function bindPopupDismiss() {
+  const dismiss = (e) => {
+    const pop = popover();
+    if (pop.hidden) return;
+    const el = e && e.target && e.target.closest ? e.target : null;
+    if (el) {
+      if (el.closest('.popover')) return; // ポップアップ内の操作は残す
+      if (el.closest('.term')) return; // 別の用語は表示側で差し替える
+    }
+    clearTimeout(popTimer);
+    hideTermPopup();
+  };
+  document.addEventListener('pointerdown', dismiss, true);
+  document.addEventListener('scroll', () => dismiss(), { passive: true, capture: true });
+  addEventListener('resize', () => dismiss());
+  addEventListener('hashchange', () => dismiss());
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') dismiss();
+  });
+}
+bindPopupDismiss();
 
 /* ============ ボトムシート ============ */
 

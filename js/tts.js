@@ -79,6 +79,13 @@ export function japaneseVoices() {
     .map((x) => x.v);
 }
 
+/** 女性音声とみなせるか(選択UIの目印に使う) */
+export function isFemaleVoice(v) {
+  const name = `${v.name} ${v.voiceURI}`;
+  if (MALE_HINTS.some((re) => re.test(name))) return false;
+  return FEMALE_HINTS.some((re) => re.test(name));
+}
+
 export function pickVoice() {
   const saved = localStorage.getItem('tts-voice');
   const list = japaneseVoices();
@@ -284,6 +291,21 @@ export function setVoice(uri) {
     synth.cancel();
     speakFrom(st.i);
   }
+}
+
+/** 設定画面での試聴。選んだ声と速度をその場で確かめられる */
+export async function preview(voiceURI, rate) {
+  if (!isSupported) return;
+  await loadVoices();
+  synth.cancel();
+  const u = new SpeechSynthesisUtterance(
+    'データセンターの価値の9割は運用が生み出しています。'
+  );
+  u.lang = 'ja-JP';
+  u.rate = rate ?? st.rate;
+  const v = voices.find((x) => x.voiceURI === voiceURI);
+  if (v) u.voice = v;
+  synth.speak(u);
 }
 
 /* Chromeは長時間の発話で内部的に停止することがあるため、
