@@ -11,6 +11,7 @@ import {
   renderReader, readerRightPanel, openSheet, closeSheet, toggleSpeech, bindTtsBar,
 } from './reader.js';
 import * as tts from './tts.js';
+import { renderCdfomHome, renderCdfomDoc, renderCdfomDrill } from './cdfom.js';
 import { initSync } from './sync.js';
 import { motifIcon, chapterMotifKey, matchMotif, homeArt } from './art.js';
 
@@ -98,6 +99,15 @@ async function route() {
     await renderReader(main(), no, r.params.get('p'), resume);
     setRightPanel(readerRightPanel(no));
     bindTocSpy();
+  } else if (p0 === 'cdfom') {
+    nav = 'cdfom';
+    const [, p1b, p2] = r.seg;
+    if (p1b === 'm') renderCdfomDoc(main(), 'module', p2);
+    else if (p1b === 'exam') renderCdfomDoc(main(), 'exam');
+    else if (p1b === 'drill') renderCdfomDrill(main());
+    else renderCdfomHome(main());
+    setRightPanel(cdfomRightPanel());
+    scrollTo(0, 0);
   } else if (p0 === 'glossary') {
     nav = 'glossary';
     renderGlossary(r.params.get('q') || '');
@@ -152,6 +162,32 @@ function updateQuotaBar() {
 function renderSidebar() {
   const cur = parseHash();
   const curCh = cur && cur.seg[0] === 'ch' ? parseInt(cur.seg[1], 10) : null;
+
+  // CDFOMを見ているときは、そちらの目次に切り替える
+  if (cur && cur.seg[0] === 'cdfom' && state.cdfom) {
+    const curMod = cur.seg[1] === 'm' ? parseInt(cur.seg[2], 10) : null;
+    const mods = state.cdfom.modules
+      .map(
+        (m) => `
+        <a class="side-ch ${curMod === m.no ? 'current' : ''}" href="#/cdfom/m/${m.no}">
+          <span class="side-ch-no">M${m.no}</span>
+          <span class="side-ch-title">${esc(m.title)}</span>
+        </a>`
+      )
+      .join('');
+    $('#sidebar-inner').innerHTML = `
+      <div class="side-title">C D F O M</div>
+      <a class="side-ch ${cur.seg[1] === 'drill' ? 'current' : ''}" href="#/cdfom/drill">
+        <span class="side-ch-no">♪</span><span class="side-ch-title">頻出箇所の聞き流し</span>
+      </a>
+      <a class="side-ch ${cur.seg[1] === 'exam' ? 'current' : ''}" href="#/cdfom/exam">
+        <span class="side-ch-no">★</span><span class="side-ch-title">試験 頻出箇所一覧</span>
+      </a>
+      <div class="side-title" style="margin-top:14px">モ ジ ュ ー ル</div>
+      ${mods}
+      <a class="side-back" href="#/">← JDCC ガイドブックへ</a>`;
+    return;
+  }
   const html = state.chapters
     .map((ch) => {
       const st = chapterState(ch.chapter);
@@ -168,13 +204,41 @@ function renderSidebar() {
         </a>`;
     })
     .join('');
-  $('#sidebar-inner').innerHTML = `<div class="side-title">章 一 覧</div>${html}`;
+  $('#sidebar-inner').innerHTML =
+    `<div class="side-title">章 一 覧</div>${html}` +
+    (state.cdfom ? '<a class="side-back" href="#/cdfom">CDFOM 研修へ →</a>' : '');
 }
 
 /* ============ 右パネル ============ */
 
 function setRightPanel(html) {
   $('#rightpanel-inner').innerHTML = html;
+}
+
+function cdfomRightPanel() {
+  const cd = state.cdfom;
+  if (!cd) return '';
+  const mods = cd.modules
+    .map(
+      (m) =>
+        `<a href="#/cdfom/m/${m.no}" class="lv3"><span class="h-num" style="margin-right:6px">M${m.no}</span>${esc(m.title)}</a>`
+    )
+    .join('');
+  return `
+    <div class="rp-section">
+      <div class="rp-title">CDFOM 研修</div>
+      <div class="rp-stat"><span>モジュール</span><strong>${cd.modules.length}</strong></div>
+      <div class="rp-stat"><span>頻出箇所</span><strong>${cd.examHighlights.length + cd.highlights.length}</strong></div>
+      <div class="rp-stat"><span>総字数</span><strong>${fmtNum(cd.modules.reduce((a, m) => a + m.chars, 0) + (cd.exam?.chars || 0))}</strong></div>
+    </div>
+    <div class="rp-section">
+      <div class="rp-title">目 次</div>
+      <nav class="rp-toc">
+        <a href="#/cdfom/drill" class="lv3">頻出箇所の聞き流し</a>
+        <a href="#/cdfom/exam" class="lv3">試験 頻出箇所一覧</a>
+        ${mods}
+      </nav>
+    </div>`;
 }
 
 function homeRightPanel() {
@@ -299,6 +363,19 @@ async function renderHome() {
       </section>
 
       ${resumeHtml}
+
+      ${
+        state.cdfom
+          ? `<a class="cd-banner" href="#/cdfom">
+               <span class="cd-banner-icon"><svg viewBox="0 0 24 24"><path d="M12 3l9 4.5-9 4.5-9-4.5z"/><path d="M6 10.5V16c0 1.7 2.7 3 6 3s6-1.3 6-3v-5.5"/></svg></span>
+               <span class="cd-banner-text">
+                 <span class="cd-banner-label">CDFOM 研修</span>
+                 <span class="cd-banner-sub">全${state.cdfom.modules.length}モジュール ・ 頻出${state.cdfom.examHighlights.length + state.cdfom.highlights.length}箇所の聞き流し</span>
+               </span>
+               <span class="resume-arrow"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></span>
+             </a>`
+          : ''
+      }
 
       ${
         state.isSample
@@ -835,6 +912,11 @@ function bindChrome() {
   nav.className = 'bottom-nav';
   nav.innerHTML = `
     <a href="#/" data-nav="home"><svg viewBox="0 0 24 24"><path d="M5 4h14v16l-7-4-7 4z"/></svg>章一覧</a>
+    ${
+      state.cdfom
+        ? '<a href="#/cdfom" data-nav="cdfom"><svg viewBox="0 0 24 24"><path d="M12 3l9 4.5-9 4.5-9-4.5z"/><path d="M6 10.5V16c0 1.7 2.7 3 6 3s6-1.3 6-3v-5.5"/></svg>CDFOM</a>'
+        : ''
+    }
     <a href="#/glossary" data-nav="glossary"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>用語集</a>
     <a href="#/highlights" data-nav="highlights"><svg viewBox="0 0 24 24"><path d="M9 15l-4 5h6l1-2M9 15L18 4l3 3-9 11M9 15l3 3"/></svg>マーカー</a>
     <a href="#/notes" data-nav="notes"><svg viewBox="0 0 24 24"><path d="M5 4h14v13l-4 3H5z"/><path d="M15 20v-3h4"/></svg>メモ</a>`;

@@ -10,6 +10,7 @@ export const state = {
   formatted: new Map(), // 章番号 → 整形済み表示データ
   glossary: [],
   baseSummaries: {}, // 章番号 → 読解サマリー(原文外)
+  cdfom: null, // CDFOM研修ノート(JDCCとは別カテゴリ)
   totalChars: 0,
   isSample: false,
   progressMap: new Map(), // 章番号 → {chapter, read:{pid:1}, done}
@@ -30,6 +31,14 @@ export async function loadAll() {
   state.glossary = await glossaryRes.json();
   const sum = await summariesRes.json();
   state.baseSummaries = sum.chapters || {};
+
+  // CDFOM研修は任意データ。なければJDCCのみで動作する
+  try {
+    const res = await fetch('data/cdfom.json');
+    if (res.ok) state.cdfom = await res.json();
+  } catch {
+    state.cdfom = null;
+  }
   state.isSample = state.chapters.some((c) => c._sample);
   state.formatted = formatAll(state.chapters);
   state.totalChars = 0;

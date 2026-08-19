@@ -3,7 +3,7 @@
  * アプリシェルと原文データ(chapters.json)をプリキャッシュし、
  * ネット接続なしでも全章を閲覧できるようにする。
  */
-const VERSION = 'jdcc-reader-v10';
+const VERSION = 'jdcc-reader-v11';
 const FONT_CACHE = 'jdcc-fonts-v1';
 
 const PRECACHE = [
@@ -19,9 +19,11 @@ const PRECACHE = [
   'js/sync.js',
   'js/art.js',
   'js/tts.js',
+  'js/cdfom.js',
   'data/chapters.json',
   'data/glossary.json',
   'data/summaries.json',
+  'data/cdfom.json',
   'icons/icon.svg',
   'icons/icon-192.png',
   'icons/icon-512.png',

@@ -162,6 +162,8 @@ const st = {
   onUnit: null,
   onEnd: null,
   warmed: false,
+  loop: false, // 最後まで読んだら先頭へ戻る(頻出箇所の繰り返し用)
+  gap: 0, // 各項目のあとに置く間(ミリ秒)
 };
 
 export const ttsState = st;
@@ -198,9 +200,17 @@ function utterFor(unit) {
   return u;
 }
 
+let gapTimer = null;
+
 function speakFrom(i) {
   if (!st.playing) return;
   if (i >= st.units.length) {
+    if (st.loop && st.units.length) {
+      // 繰り返し再生: 先頭へ戻る
+      st.onLoop?.();
+      speakFrom(0);
+      return;
+    }
     stop();
     st.onEnd?.();
     return;
@@ -211,7 +221,13 @@ function speakFrom(i) {
 
   const u = utterFor(unit);
   u.onend = () => {
-    if (st.playing) speakFrom(i + 1);
+    if (!st.playing) return;
+    if (st.gap > 0) {
+      clearTimeout(gapTimer);
+      gapTimer = setTimeout(() => st.playing && speakFrom(i + 1), st.gap);
+    } else {
+      speakFrom(i + 1);
+    }
   };
   u.onerror = (e) => {
     // interrupted / canceled は stop() 由来なので無視
@@ -245,6 +261,9 @@ export async function play(units, startIndex = 0, handlers = {}) {
   st.units = units;
   st.onUnit = handlers.onUnit || null;
   st.onEnd = handlers.onEnd || null;
+  st.onLoop = handlers.onLoop || null;
+  st.loop = !!handlers.loop;
+  st.gap = handlers.gap ?? 0;
   st.playing = true;
   speakFrom(Math.max(0, Math.min(startIndex, units.length - 1)));
   return true;
@@ -252,11 +271,18 @@ export async function play(units, startIndex = 0, handlers = {}) {
 
 export function stop() {
   st.playing = false;
+  st.loop = false;
+  clearTimeout(gapTimer);
   try {
     synth.cancel();
   } catch {
     /* noop */
   }
+}
+
+/** 再生中でも繰り返しの有無を切り替える */
+export function setLoop(on) {
+  st.loop = !!on;
 }
 
 export function isPlaying() {
