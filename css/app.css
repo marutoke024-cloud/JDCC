@@ -1057,7 +1057,12 @@ body.notepad-open .tts-bar { transform: translateX(calc(-50% - var(--notepad-w) 
 
 .tts-meta { display: flex; flex-direction: column; line-height: 1.3; margin: 0 6px 0 4px; min-width: 0; }
 .tts-label { font-size: 11.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tts-pos { font-size: 10.5px; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.tts-pos { font-size: 10.5px; color: var(--ink-faint); font-variant-numeric: tabular-nums; display: flex; gap: 7px; align-items: center; }
+.tts-awake {
+  font-size: 9.5px; letter-spacing: 0.04em; color: var(--accent);
+  border: 1px solid var(--accent-soft); background: var(--accent-tint);
+  border-radius: 99px; padding: 1px 6px; white-space: nowrap;
+}
 
 .tts-rate { display: flex; align-items: center; gap: 7px; padding-left: 6px; border-left: 1px solid var(--hairline); }
 .tts-rate span { font-size: 10.5px; color: var(--ink-soft); font-variant-numeric: tabular-nums; min-width: 38px; }

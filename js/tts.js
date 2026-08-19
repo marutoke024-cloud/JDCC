@@ -265,6 +265,19 @@ export async function play(units, startIndex = 0, handlers = {}) {
   st.loop = !!handlers.loop;
   st.gap = handlers.gap ?? 0;
   st.playing = true;
+
+  // 画面が消えて止まらないように保持をかける(効果は端末による)
+  acquireWakeLock();
+  startSilentAudio();
+  if (handlers.title) {
+    setMediaSession(handlers.title, handlers.subtitle, {
+      pause: () => stop(),
+      stop: () => stop(),
+      next: () => next(),
+      prev: () => prev(),
+    });
+  }
+
   speakFrom(Math.max(0, Math.min(startIndex, units.length - 1)));
   return true;
 }
@@ -273,6 +286,9 @@ export function stop() {
   st.playing = false;
   st.loop = false;
   clearTimeout(gapTimer);
+  releaseWakeLock();
+  stopSilentAudio();
+  clearMediaSession();
   try {
     synth.cancel();
   } catch {
@@ -333,6 +349,132 @@ export async function preview(voiceURI, rate) {
   if (v) u.voice = v;
   synth.speak(u);
 }
+
+/* ============ 画面スリープ・バックグラウンド対策 ============ */
+
+/*
+ * Web Speech API は「メディア再生」ではなく読み上げ機能として扱われるため、
+ * 画面を消すと OS 側で止められることが多い。完全に防ぐ手段はブラウザにないが、
+ * 次の2つで実用上の継続性を上げる。
+ *   1. Screen Wake Lock — 再生中は画面を消させない(いちばん確実)
+ *   2. 無音のオーディオ再生 — オーディオセッションを保持して停止を起きにくくする
+ * どちらも再生を止めたら解放する。
+ */
+
+let wakeLock = null;
+
+/** 画面を消させない保持が効いているか(UI表示用) */
+export function hasWakeLock() {
+  return !!wakeLock;
+}
+
+async function acquireWakeLock() {
+  if (!('wakeLock' in navigator) || wakeLock) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener?.('release', () => {
+      wakeLock = null;
+      document.dispatchEvent(new CustomEvent('tts-wakelock-changed'));
+    });
+    document.dispatchEvent(new CustomEvent('tts-wakelock-changed'));
+  } catch {
+    wakeLock = null; // 権限やバッテリー状況で失敗することがある
+  }
+}
+
+function releaseWakeLock() {
+  try {
+    wakeLock?.release?.();
+  } catch {
+    /* noop */
+  }
+  wakeLock = null;
+}
+
+let audioCtx = null;
+let silentNode = null;
+
+/** 無音を流し続けて、オーディオセッションを保持する */
+function startSilentAudio() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    audioCtx = audioCtx || new Ctx();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    if (silentNode) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    gain.gain.value = 0.0001; // 聞こえないが、無音すぎると止められることがある
+    osc.frequency.value = 30;
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    silentNode = { osc, gain };
+  } catch {
+    /* 使えない環境ではそのまま続行 */
+  }
+}
+
+function stopSilentAudio() {
+  try {
+    silentNode?.osc.stop();
+    silentNode?.osc.disconnect();
+    silentNode?.gain.disconnect();
+  } catch {
+    /* noop */
+  }
+  silentNode = null;
+  try {
+    if (audioCtx && audioCtx.state === 'running') audioCtx.suspend();
+  } catch {
+    /* noop */
+  }
+}
+
+/** ロック画面や通知領域に、いま読んでいるものを出す */
+export function setMediaSession(title, artist, handlers = {}) {
+  if (!('mediaSession' in navigator)) return;
+  try {
+    navigator.mediaSession.metadata = new window.MediaMetadata({
+      title,
+      artist: artist || 'DC運用ガイド 読本',
+      album: '読み上げ',
+      artwork: [
+        { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+        { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+      ],
+    });
+    navigator.mediaSession.playbackState = 'playing';
+    const set = (a, fn) => {
+      try {
+        navigator.mediaSession.setActionHandler(a, fn);
+      } catch {
+        /* 未対応のアクションは無視 */
+      }
+    };
+    set('play', handlers.play || null);
+    set('pause', handlers.pause || null);
+    set('stop', handlers.stop || null);
+    set('nexttrack', handlers.next || null);
+    set('previoustrack', handlers.prev || null);
+  } catch {
+    /* noop */
+  }
+}
+
+function clearMediaSession() {
+  if (!('mediaSession' in navigator)) return;
+  try {
+    navigator.mediaSession.playbackState = 'none';
+  } catch {
+    /* noop */
+  }
+}
+
+/* 画面を戻したときに Wake Lock を取り直す(タブ切り替えで失われるため) */
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && st.playing) acquireWakeLock();
+});
 
 /* Chromeは長時間の発話で内部的に停止することがあるため、
    再生中は定期的に resume を呼んで取りこぼしを防ぐ */

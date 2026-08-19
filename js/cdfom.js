@@ -251,6 +251,7 @@ export function renderCdfomDrill(main) {
               .join('')}
           </select>
         </label>
+        <span class="tts-awake" id="drill-awake" hidden title="再生中は画面を消さないようにしています">画面ON保持</span>
         <button class="btn btn-primary" id="drill-play">
           <svg viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z"/></svg><span>再生</span>
         </button>
@@ -315,6 +316,8 @@ function bindDrill(main) {
 function paintDrillState(main, playing) {
   const btn = main.querySelector('#drill-play');
   if (!btn) return;
+  const awake = main.querySelector('#drill-awake');
+  if (awake) awake.hidden = !(playing && tts.hasWakeLock());
   btn.querySelector('span').textContent = playing ? '停止' : '再生';
   btn.querySelector('svg').innerHTML = playing
     ? '<rect x="7" y="6" width="4" height="12" rx="1"/><rect x="13" y="6" width="4" height="12" rx="1"/>'
@@ -343,6 +346,8 @@ async function startDrill(main, from) {
   const ok = await tts.play(units, from, {
     loop,
     gap,
+    title: '頻出箇所の聞き流し',
+    subtitle: 'CDFOM 試験対策',
     onUnit: (_u, i) => {
       main.querySelectorAll('.drill-item.on').forEach((e) => e.classList.remove('on'));
       const li = main.querySelector(`.drill-item[data-i="${i}"]`);
@@ -359,4 +364,8 @@ async function startDrill(main, from) {
     onEnd: () => paintDrillState(main, false),
   });
   paintDrillState(main, ok);
+  // 画面保持は非同期に確定するため、確定後にもう一度表示を合わせる
+  document.addEventListener('tts-wakelock-changed', () => paintDrillState(main, tts.isPlaying()), {
+    once: true,
+  });
 }

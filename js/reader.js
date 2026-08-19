@@ -749,7 +749,15 @@ function setTtsUI(playing) {
   // 別の場所で設定が変わっていても表示を合わせる
   const auto = document.getElementById('tts-auto');
   if (auto) auto.checked = isAutoAdvance();
+  const awake = document.getElementById('tts-awake');
+  if (awake) awake.hidden = !(playing && tts.hasWakeLock());
 }
+
+// 画面保持の状態が変わったら表示を更新する
+document.addEventListener('tts-wakelock-changed', () => {
+  const awake = document.getElementById('tts-awake');
+  if (awake) awake.hidden = !(tts.isPlaying() && tts.hasWakeLock());
+});
 
 function updateTtsPos(i) {
   const pos = document.getElementById('tts-pos');
@@ -836,6 +844,8 @@ async function startSpeech(from) {
   document.getElementById('tts-label').textContent = `${target.label} を読み上げ中`;
 
   const ok = await tts.play(ttsUnits, from, {
+    title: target.label,
+    subtitle: target.cat === 'cdfom' ? 'CDFOM 研修' : 'JDCC ガイドブック',
     onUnit: (unit, i) => {
       highlightUnit(unit);
       updateTtsPos(i);
