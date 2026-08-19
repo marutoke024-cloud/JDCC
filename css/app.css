@@ -921,6 +921,9 @@ body.notepad-open .notepad {
 .cd-focus-actions .btn svg { fill: currentColor; stroke: none; }
 .cd-focus-actions .btn:last-child svg { fill: none; stroke: currentColor; }
 
+.cd-doc-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.cd-doc-actions .btn svg { fill: currentColor; stroke: none; }
+
 /* CDFOM本文 */
 .cd-prose { font-family: var(--sans); font-size: calc(var(--prose-size) - 1.5px); line-height: 1.85; }
 .cd-prose .cd-h2 {
@@ -1059,6 +1062,14 @@ body.notepad-open .tts-bar { transform: translateX(calc(-50% - var(--notepad-w) 
 .tts-rate { display: flex; align-items: center; gap: 7px; padding-left: 6px; border-left: 1px solid var(--hairline); }
 .tts-rate span { font-size: 10.5px; color: var(--ink-soft); font-variant-numeric: tabular-nums; min-width: 38px; }
 .tts-rate input[type="range"] { width: 78px; accent-color: var(--accent); }
+
+.tts-auto {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11px; color: var(--ink-soft);
+  padding-left: 8px; border-left: 1px solid var(--hairline);
+  white-space: nowrap; cursor: pointer;
+}
+.tts-auto input { accent-color: var(--accent); width: 14px; height: 14px; }
 
 .tts-voice {
   max-width: 150px;

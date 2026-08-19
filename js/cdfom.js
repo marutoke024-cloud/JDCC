@@ -110,6 +110,12 @@ export function renderCdfomDoc(main, kind, no) {
           <span>${fmtNum(doc.chars)} 字</span>
           <span>頻出 ${hlCount} 箇所</span>
         </div>
+        <div class="cd-doc-actions">
+          <button class="btn btn-sm" id="cd-speak">
+            <svg viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z"/></svg>このモジュールを読み上げ
+          </button>
+          <a class="btn btn-sm btn-ghost" href="#/cdfom/drill">頻出箇所だけ聞く</a>
+        </div>
       </header>
       <hr class="reader-rule">
       <div class="prose cd-prose" id="prose">
@@ -128,6 +134,58 @@ export function renderCdfomDoc(main, kind, no) {
         }
       </nav>
     </article>`;
+
+  // reader.js とは相互参照になるため、押されたときに読み込む
+  main.querySelector('#cd-speak').onclick = async () => {
+    const r = await import('./reader.js');
+    r.toggleSpeech();
+  };
+}
+
+/* ============ モジュール本文の読み上げ ============ */
+
+/** CDFOMの1文書 → 読み上げ単位。見出しも読み、章内の位置がわかるようにする */
+export function docSpeechUnits(doc) {
+  const units = [];
+  for (const b of doc.blocks) {
+    if (b.type === 'heading') {
+      const t = b.segs.map((s) => s.t).join('').trim();
+      if (t) units.push({ pid: b.id, text: t, heading: true });
+      continue;
+    }
+    for (const line of b.lines) {
+      const t = line.map((s) => s.t).join('').trim();
+      if (t.length < 2) continue;
+      units.push({ pid: b.id, text: t, heading: false });
+    }
+  }
+  return units;
+}
+
+/** いま表示している文書(モジュール/頻出一覧)を特定する */
+function currentDoc(kind, no) {
+  const cd = state.cdfom;
+  if (!cd) return null;
+  return kind === 'exam' ? cd.exam : cd.modules.find((m) => m.no === parseInt(no, 10));
+}
+
+/** 次に読む文書。モジュールは順に進み、最後まで行ったら止まる */
+export function nextDoc(kind, no) {
+  const cd = state.cdfom;
+  if (!cd || kind === 'exam') return null;
+  const next = cd.modules.find((m) => m.no === parseInt(no, 10) + 1);
+  return next ? { kind: 'module', no: next.no, title: `モジュール${next.no} ${next.title}` } : null;
+}
+
+export function cdfomDocInfo(kind, no) {
+  const doc = currentDoc(kind, no);
+  if (!doc) return null;
+  return {
+    doc,
+    units: docSpeechUnits(doc),
+    label: kind === 'exam' ? '試験 頻出箇所一覧' : `モジュール${doc.no} ${doc.title}`,
+    next: nextDoc(kind, no),
+  };
 }
 
 /* ============ 頻出箇所ドリル(聞き流し) ============ */

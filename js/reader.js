@@ -10,6 +10,7 @@ import {
 import * as db from './db.js';
 import { chapterHero, sectionVignette, matchMotif } from './art.js';
 import * as tts from './tts.js';
+import { cdfomDocInfo } from './cdfom.js';
 
 const isTouch = matchMedia('(pointer: coarse)').matches;
 
@@ -667,8 +668,9 @@ export async function renderReader(main, no, targetPid, resumePos) {
 
   renderSummaryBox(main.querySelector('#summary-box'), no);
 
-  // 章が変わったら読み上げ単位を組み直す(再生中なら止める)
-  if (ttsChapter !== no) {
+  // 章が変わったら読み上げ単位を組み直す。
+  // ただし自動送りで来た場合は、再生を止めずにそのまま引き継ぐ。
+  if (ttsChapter !== no && !pendingAutoPlay) {
     if (tts.isPlaying()) tts.stop();
     ttsUnits = tts.speechUnits(f.blocks);
     ttsChapter = no;
@@ -744,6 +746,9 @@ function setTtsUI(playing) {
   bar.hidden = false;
   bar.classList.toggle('playing', playing);
   document.getElementById('btn-tts')?.classList.toggle('active', playing);
+  // 別の場所で設定が変わっていても表示を合わせる
+  const auto = document.getElementById('tts-auto');
+  if (auto) auto.checked = isAutoAdvance();
 }
 
 function updateTtsPos(i) {
@@ -751,48 +756,123 @@ function updateTtsPos(i) {
   if (pos) pos.textContent = `${i + 1} / ${ttsUnits.length}`;
 }
 
-/** 読み上げの開始/停止。章ビューから呼ばれる */
-export async function toggleSpeech(chapterNo) {
+/* 現在読み上げている対象。JDCCの章とCDFOMの文書の両方を扱う */
+let ttsTarget = null; // { cat:'jdcc'|'cdfom', kind, no, label, next }
+
+/** 読み上げ対象を、いま開いているページから決める */
+function resolveTarget() {
+  const h = location.hash || '';
+  const mCh = h.match(/^#\/ch\/(\d+)/);
+  if (mCh) {
+    const no = parseInt(mCh[1], 10);
+    const f = state.formatted.get(no);
+    if (!f) return null;
+    const next = state.chapters.find((c) => c.chapter === no + 1);
+    return {
+      cat: 'jdcc',
+      no,
+      units: tts.speechUnits(f.blocks),
+      label: `第${no}章 ${chapterShortTitle(no)}`,
+      next: next ? { href: `#/ch/${next.chapter}`, label: `第${next.chapter}章 ${chapterShortTitle(next.chapter)}` } : null,
+    };
+  }
+  const mMod = h.match(/^#\/cdfom\/m\/(\d+)/);
+  const isExam = /^#\/cdfom\/exam/.test(h);
+  if (mMod || isExam) {
+    const info = cdfomDocInfo(isExam ? 'exam' : 'module', mMod ? mMod[1] : null);
+    if (!info) return null;
+    return {
+      cat: 'cdfom',
+      no: info.doc.no,
+      units: info.units,
+      label: info.label,
+      next: info.next ? { href: `#/cdfom/m/${info.next.no}`, label: info.next.title } : null,
+    };
+  }
+  return null;
+}
+
+/** 章をまたいで読み続けるか(トップバーのトグルで切り替え) */
+export function isAutoAdvance() {
+  return localStorage.getItem('tts-auto') !== '0';
+}
+
+/** 読み上げの開始/停止。章ビュー・CDFOMビューの両方から呼ばれる */
+export async function toggleSpeech() {
   if (!tts.isSupported) {
     toast('この端末では読み上げに対応していません');
     return;
   }
   if (tts.isPlaying()) {
-    tts.stop();
-    setTtsUI(false);
-    document.querySelectorAll('.speaking').forEach((e) => e.classList.remove('speaking'));
+    stopSpeech();
     return;
   }
 
-  const f = state.formatted.get(chapterNo);
-  if (!f) return;
-  if (ttsChapter !== chapterNo || !ttsUnits.length) {
-    ttsUnits = tts.speechUnits(f.blocks);
-    ttsChapter = chapterNo;
+  const target = resolveTarget();
+  if (!target) {
+    toast('章またはモジュールを開いてから読み上げを始めてください');
+    return;
   }
-  if (!ttsUnits.length) {
+  if (!target.units.length) {
     toast('読み上げる本文がありません');
     return;
   }
+  ttsTarget = target;
+  ttsUnits = target.units;
+  ttsChapter = target.cat === 'jdcc' ? target.no : null;
 
-  const start = unitIndexAtView();
+  await startSpeech(unitIndexAtView());
+}
+
+function stopSpeech() {
+  tts.stop();
+  setTtsUI(false);
+  document.querySelectorAll('.speaking').forEach((e) => e.classList.remove('speaking'));
+}
+
+async function startSpeech(from) {
+  const target = ttsTarget;
   setTtsUI(true);
-  document.getElementById('tts-label').textContent = `第${chapterNo}章を読み上げ中`;
+  document.getElementById('tts-label').textContent = `${target.label} を読み上げ中`;
 
-  const ok = await tts.play(ttsUnits, start, {
+  const ok = await tts.play(ttsUnits, from, {
     onUnit: (unit, i) => {
       highlightUnit(unit);
       updateTtsPos(i);
-      // 読み上げた段落はしおりとして記録しておく
-      if (!unit.heading) saveBookmark(chapterNo, unit.pid);
+      // JDCCの本文はしおりとしても記録しておく
+      if (target.cat === 'jdcc' && !unit.heading) saveBookmark(target.no, unit.pid);
     },
     onEnd: () => {
-      setTtsUI(false);
       document.querySelectorAll('.speaking').forEach((e) => e.classList.remove('speaking'));
-      toast('この章の読み上げが終わりました');
+      // 次の章/モジュールへ自動で送る
+      if (isAutoAdvance() && target.next) {
+        toast(`${target.next.label} へ続けます`);
+        pendingAutoPlay = true;
+        location.hash = target.next.href;
+        return;
+      }
+      setTtsUI(false);
+      toast('読み上げが終わりました');
     },
   });
   if (!ok) setTtsUI(false);
+}
+
+/* 次の章へ遷移したあと、描画完了を待って自動で再生を継続する */
+let pendingAutoPlay = false;
+
+export async function resumeAutoPlay() {
+  if (!pendingAutoPlay) return;
+  pendingAutoPlay = false;
+  const target = resolveTarget();
+  if (!target || !target.units.length) {
+    setTtsUI(false);
+    return;
+  }
+  ttsTarget = target;
+  ttsUnits = target.units;
+  ttsChapter = target.cat === 'jdcc' ? target.no : null;
+  await startSpeech(0);
 }
 
 /** 読み上げバーの操作を1度だけ結線する */
@@ -801,15 +881,23 @@ export function bindTtsBar() {
   if (!bar || bar.dataset.bound) return;
   bar.dataset.bound = '1';
 
-  document.getElementById('tts-toggle').onclick = () => toggleSpeech(ttsChapter ?? currentChapter);
+  document.getElementById('tts-toggle').onclick = () => toggleSpeech();
   document.getElementById('tts-next').onclick = () => tts.next();
   document.getElementById('tts-prev').onclick = () => tts.prev();
   document.getElementById('tts-close').onclick = () => {
+    pendingAutoPlay = false;
     tts.stop();
     bar.hidden = true;
     document.getElementById('btn-tts')?.classList.remove('active');
     document.querySelectorAll('.speaking').forEach((e) => e.classList.remove('speaking'));
   };
+
+  // 章をまたいで読み続けるかの切り替え
+  const auto = document.getElementById('tts-auto');
+  if (auto) {
+    auto.checked = isAutoAdvance();
+    auto.onchange = () => localStorage.setItem('tts-auto', auto.checked ? '1' : '0');
+  }
 
   const rate = document.getElementById('tts-rate');
   rate.value = tts.ttsState.rate;

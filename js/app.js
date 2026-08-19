@@ -8,7 +8,8 @@ import {
 } from './state.js';
 import * as db from './db.js';
 import {
-  renderReader, readerRightPanel, openSheet, closeSheet, toggleSpeech, bindTtsBar,
+  renderReader, readerRightPanel, openSheet, closeSheet,
+  toggleSpeech, bindTtsBar, resumeAutoPlay,
 } from './reader.js';
 import * as tts from './tts.js';
 import { renderCdfomHome, renderCdfomDoc, renderCdfomDrill } from './cdfom.js';
@@ -130,6 +131,9 @@ async function route() {
   });
   renderSidebar();
   updateQuotaBar();
+
+  // 前の章の読み上げが終わって遷移してきた場合は、そのまま続きを読む
+  resumeAutoPlay();
 }
 
 /* ============ トップバー:今日のノルマ ============ */
@@ -869,15 +873,7 @@ function bindChrome() {
     bindTtsBar();
     // ポインタが乗った時点で音声エンジンを温めておき、押した瞬間に声が出るようにする
     btnTts.addEventListener('pointerenter', () => tts.prewarm(), { once: true });
-    btnTts.onclick = () => {
-      const r = parseHash();
-      const no = r && r.seg[0] === 'ch' ? parseInt(r.seg[1], 10) : null;
-      if (!no) {
-        toast('章を開いてから読み上げを始めてください');
-        return;
-      }
-      toggleSpeech(no);
-    };
+    btnTts.onclick = () => toggleSpeech();
   } else {
     btnTts.hidden = true;
   }
